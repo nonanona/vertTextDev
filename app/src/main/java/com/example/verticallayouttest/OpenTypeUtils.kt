@@ -3,10 +3,18 @@ package com.example.verticallayouttest
 import android.util.Log
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.util.*
 
 private const val TAG_vmtx = 0x766d7478
 private const val TAG_vhea = 0x76686561
 private const val TAG_head = 0x68656164
+private const val TAG_hmtx = 0x686d7478
+private const val TAG_hhea = 0x68686561
+private const val TAG_GSUB = 0x47535542
+private const val TAG_vert = 0x76657274
+private const val TAG_vrt2 = 0x76727432
+private const val TAG_kana = 0x6B616E61
+private const val TAG_JAN_ = 0x4A414E20
 
 data class Metadata(
     val upem: Int
@@ -31,9 +39,36 @@ data class OpenType(
                 vmtxOffset,
                 numOfLongVerMetrics,
                 metadata
-            ).also {
-                it.getVAdvance(0)
-            }
+            )
+        }
+    }
+
+    val horizontalMetrics: OpenTypeTable_hmtx? by lazy {
+        val hheaOffset = tables[TAG_hhea]
+        val hmtxOffset = tables[TAG_hmtx]
+        if (hheaOffset == null || hmtxOffset == null) {
+            null
+        } else {
+            val hheaBuf = buffer.slice().order(ByteOrder.BIG_ENDIAN)
+            val numOfLongVerMetrics = hheaBuf.getUint16(hheaOffset + 34)
+
+            OpenTypeTable_hmtx(
+                buffer.slice().order(ByteOrder.BIG_ENDIAN),
+                hmtxOffset,
+                numOfLongVerMetrics,
+                metadata
+            )
+        }
+    }
+
+    val glyphSubstitution: OpenTypeTable_GSUB? by lazy {
+        val gsubOffset = tables[TAG_GSUB]
+        if (gsubOffset == null) {
+            null
+        } else {
+            OpenTypeTable_GSUB(
+                buffer.slice().order(ByteOrder.BIG_ENDIAN),
+                gsubOffset)
         }
     }
 }
@@ -46,13 +81,140 @@ class OpenTypeTable_vmtx(
 ) {
     fun getVAdvance(glyphId: Int): Float {
         if (glyphId < numOfLongVerMetrics) {
-            Log.e("Debug", "Glyph ID = $glyphId, vAdvance = ${buffer.getUint16(offset + 4 * glyphId)}, bearing = ${buffer.getInt16(offset + 4 * glyphId + 2)}")
             return buffer.getUint16(offset + 4 * glyphId).toFloat() / metadata.upem.toFloat()
         } else {
-            0f
+            return 0f
         }
-        return 0f
     }
+}
+
+class OpenTypeTable_hmtx(
+    private val buffer: ByteBuffer,
+    private val offset: Int,
+    private val numOfLongHoriMetrics: Int,
+    private val metadata: Metadata
+) {
+    fun getHAdvance(glyphId: Int): Float {
+        if (glyphId < numOfLongHoriMetrics) {
+            return buffer.getUint16(offset + 4 * glyphId).toFloat() / metadata.upem.toFloat()
+        } else {
+            return 0f
+        }
+    }
+}
+
+class OpenTypeTable_GSUB(
+    private val buffer: ByteBuffer,
+    private val offset: Int
+) {
+    init {
+        val scriptListOffset = offset + buffer.getUint16(offset + 4)
+        val featureListOffset = offset + buffer.getUint16(offset + 6)
+        val lookupListOffset = offset + buffer.getUint16(offset + 8)
+
+        val scriptCount = buffer.getUint16(scriptListOffset)
+        for (i in 0 until scriptCount) {
+            val tag = buffer.getTag(scriptListOffset + 2 + 6 * i)
+            val offset = buffer.getUint16(scriptListOffset + 2 + 6 * i + 4)
+            if (tag == TAG_kana) {
+                readScriptTable(buffer, scriptListOffset + offset, featureListOffset, lookupListOffset)
+            }
+        }
+    }
+
+    private fun readScriptTable(buffer: ByteBuffer, offset: Int, featureListOffset: Int, lookupListOffset: Int) {
+        val defaultLangSysOffset = buffer.getUint16(offset)
+        val langSysCount = buffer.getUint16(offset + 2)
+        for (i in 0 until langSysCount) {
+            val tag = buffer.getTag(offset + 4 + 6 * i)
+            val langSysOffset = buffer.getUint16(offset + 4 + 6 * i + 4)
+            if (tag == TAG_JAN_) {
+                readLangSysTable(buffer, offset + langSysOffset, featureListOffset, lookupListOffset)
+            }
+        }
+    }
+
+    private fun readLangSysTable(buffer: ByteBuffer, offset: Int, featureListOffset: Int, lookupListOffset: Int) {
+        val requiredFeatureIndex = buffer.getUint16(offset + 2)
+        val featureIndexCount = buffer.getUint16(offset + 4)
+        for (i in 0 until featureIndexCount) {
+            val index = buffer.getUint16(offset + 6 + 2 * i)
+            val tag = buffer.getTag(featureListOffset + 2 + 6 * index)
+            val featureOffset = buffer.getUint16(featureListOffset + 2 + 6 * index + 4)
+            if (tag == TAG_vrt2) {
+                readFeatureTable(buffer, featureListOffset + featureOffset, lookupListOffset)
+            }
+        }
+    }
+
+    private fun readFeatureTable(buffer: ByteBuffer, offset: Int, lookupListOffset: Int) {
+        val featureParamsOffset = buffer.getUint16(offset)
+        val lookupIndexCount = buffer.getUint16(offset + 2)
+        for (i in 0 until lookupIndexCount) {
+            val index = buffer.getUint16(offset + 4 + 2 * i)
+            val lookupOffset = buffer.getUint16(lookupListOffset + 2 + 2 * index)
+            readLookupTable(buffer, lookupListOffset + lookupOffset)
+        }
+    }
+
+    private fun readLookupTable(buffer: ByteBuffer, offset: Int) {
+        val lookupType = buffer.getUint16(offset)
+        val lookupFlag = buffer.getUint16(offset + 2)
+        val subTableCount = buffer.getUint16(offset + 4)
+
+        for (i in 0 until subTableCount) {
+            val subtableOffset = buffer.getUint16(offset + 6 + i * 2)
+            readLookupSubtable(buffer, offset + subtableOffset, lookupType)
+        }
+    }
+
+    private fun readLookupSubtable(buffer: ByteBuffer, offset: Int, type: Int) {
+        val format = buffer.getUint16(offset)
+        when (type) {
+            1 -> when (format) {
+                2 -> readLookupTableType1Format2(buffer, offset)
+                else -> throw NotImplementedError("Not implemented LookupTable: type = $type, format = $format")
+            }
+            else -> throw NotImplementedError("Not implemented LookupTable: type = $type, format = $format")
+        }
+
+    }
+
+    private fun readLookupTableType1Format2(buffer: ByteBuffer, offset: Int) {
+        val coverageOffset = buffer.getUint16(offset + 2)
+        val glyphCount = buffer.getInt16(offset + 4)
+        val fromGlyphArray = IntArray(glyphCount) { -1 }
+        readCoverage(buffer, offset + coverageOffset, fromGlyphArray)
+
+        val toGlyphArray = IntArray(glyphCount) { -1 }
+        for (i in 0 until glyphCount) {
+            toGlyphArray[i] = buffer.getUint16(offset + 6 + i * 2)
+        }
+    }
+
+    private fun readCoverage(buffer: ByteBuffer, offset: Int, glyphArray: IntArray) {
+        val format = buffer.getUint16(offset)
+        if (format == 1) {
+            val glyphCount = buffer.getUint16(offset + 2)
+            for (i in 0 until glyphCount) {
+                val glyphId = buffer.getUint16(offset + 4 + 2 * i)
+                glyphArray[i] = glyphId
+            }
+        } else if (format == 2) {
+            val rangeCount = buffer.getUint16(offset + 2)
+            for (i in 0 until rangeCount) {
+                val startGID = buffer.getUint16(offset + 4 + 6 * i)
+                val endGID = buffer.getUint16(offset + 4 + 6 * i + 2)
+                val startCoverageIndex = buffer.getUint16(offset + 4 + 6 * i + 4)
+                for (gID in startGID..endGID) {
+                    glyphArray[startCoverageIndex + gID - startGID] = gID
+                }
+            }
+        } else {
+            throw NotImplementedError("Not implemented Coverage format = $format")
+        }
+    }
+
 }
 
 object OpenTypeUtils {
@@ -82,7 +244,7 @@ object OpenTypeUtils {
         }
 
         tables.forEach { key, value ->
-            Log.e("Debug", "${key.toTagString()} : ${value}")
+            Log.e("Debug", "${key.toTagString()} : ${String.format("0x%08x", value)}")
         }
         return OpenType(buf.slice().order(ByteOrder.BIG_ENDIAN), tables, parseHeader(buf, tables[TAG_head]!!))
     }
