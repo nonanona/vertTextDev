@@ -1,6 +1,7 @@
 package com.example.verticallayouttest
 
 import android.util.Log
+import java.lang.IllegalArgumentException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.*
@@ -83,7 +84,7 @@ class OpenTypeTable_vmtx(
         if (glyphId < numOfLongVerMetrics) {
             return buffer.getUint16(offset + 4 * glyphId).toFloat() / metadata.upem.toFloat()
         } else {
-            return 0f
+            return buffer.getUint16(offset + 4 * (numOfLongVerMetrics - 1)).toFloat() / metadata.upem.toFloat()
         }
     }
 }
@@ -107,114 +108,165 @@ class OpenTypeTable_GSUB(
     private val buffer: ByteBuffer,
     private val offset: Int
 ) {
-    init {
-        val scriptListOffset = offset + buffer.getUint16(offset + 4)
-        val featureListOffset = offset + buffer.getUint16(offset + 6)
-        val lookupListOffset = offset + buffer.getUint16(offset + 8)
+    private val scriptListOffset = offset + buffer.getUint16(offset + 4)
+    private val featureListOffset = offset + buffer.getUint16(offset + 6)
+    private val lookupListOffset = offset + buffer.getUint16(offset + 8)
 
-        val scriptCount = buffer.getUint16(scriptListOffset)
-        for (i in 0 until scriptCount) {
-            val tag = buffer.getTag(scriptListOffset + 2 + 6 * i)
-            val offset = buffer.getUint16(scriptListOffset + 2 + 6 * i + 4)
-            if (tag == TAG_kana) {
-                readScriptTable(buffer, scriptListOffset + offset, featureListOffset, lookupListOffset)
-            }
-        }
+    private val singleSubstitutionCache = mutableMapOf<Triple<Int, Int, Int>, Map<Int, Int>?>()
+
+    fun getSingleSubstitution(script: String, langSys: String, feature: String): Map<Int, Int>? {
+        return getSingleSubstitution(script.toTag(), langSys.toTag(), feature.toTag())
     }
 
-    private fun readScriptTable(buffer: ByteBuffer, offset: Int, featureListOffset: Int, lookupListOffset: Int) {
-        val defaultLangSysOffset = buffer.getUint16(offset)
-        val langSysCount = buffer.getUint16(offset + 2)
-        for (i in 0 until langSysCount) {
-            val tag = buffer.getTag(offset + 4 + 6 * i)
-            val langSysOffset = buffer.getUint16(offset + 4 + 6 * i + 4)
-            if (tag == TAG_JAN_) {
-                readLangSysTable(buffer, offset + langSysOffset, featureListOffset, lookupListOffset)
-            }
-        }
-    }
-
-    private fun readLangSysTable(buffer: ByteBuffer, offset: Int, featureListOffset: Int, lookupListOffset: Int) {
-        val requiredFeatureIndex = buffer.getUint16(offset + 2)
-        val featureIndexCount = buffer.getUint16(offset + 4)
-        for (i in 0 until featureIndexCount) {
-            val index = buffer.getUint16(offset + 6 + 2 * i)
-            val tag = buffer.getTag(featureListOffset + 2 + 6 * index)
-            val featureOffset = buffer.getUint16(featureListOffset + 2 + 6 * index + 4)
-            if (tag == TAG_vrt2) {
-                readFeatureTable(buffer, featureListOffset + featureOffset, lookupListOffset)
-            }
-        }
-    }
-
-    private fun readFeatureTable(buffer: ByteBuffer, offset: Int, lookupListOffset: Int) {
-        val featureParamsOffset = buffer.getUint16(offset)
-        val lookupIndexCount = buffer.getUint16(offset + 2)
-        for (i in 0 until lookupIndexCount) {
-            val index = buffer.getUint16(offset + 4 + 2 * i)
-            val lookupOffset = buffer.getUint16(lookupListOffset + 2 + 2 * index)
-            readLookupTable(buffer, lookupListOffset + lookupOffset)
-        }
-    }
-
-    private fun readLookupTable(buffer: ByteBuffer, offset: Int) {
-        val lookupType = buffer.getUint16(offset)
-        val lookupFlag = buffer.getUint16(offset + 2)
-        val subTableCount = buffer.getUint16(offset + 4)
-
-        for (i in 0 until subTableCount) {
-            val subtableOffset = buffer.getUint16(offset + 6 + i * 2)
-            readLookupSubtable(buffer, offset + subtableOffset, lookupType)
-        }
-    }
-
-    private fun readLookupSubtable(buffer: ByteBuffer, offset: Int, type: Int) {
-        val format = buffer.getUint16(offset)
-        when (type) {
-            1 -> when (format) {
-                2 -> readLookupTableType1Format2(buffer, offset)
-                else -> throw NotImplementedError("Not implemented LookupTable: type = $type, format = $format")
-            }
-            else -> throw NotImplementedError("Not implemented LookupTable: type = $type, format = $format")
+    fun getSingleSubstitution(script: Int, langSys: Int, feature: Int): Map<Int, Int>? {
+        val key = Triple(script, langSys, feature)
+        val cached = singleSubstitutionCache[key]
+        if (cached != null) {
+            return cached
         }
 
-    }
-
-    private fun readLookupTableType1Format2(buffer: ByteBuffer, offset: Int) {
-        val coverageOffset = buffer.getUint16(offset + 2)
-        val glyphCount = buffer.getInt16(offset + 4)
-        val fromGlyphArray = IntArray(glyphCount) { -1 }
-        readCoverage(buffer, offset + coverageOffset, fromGlyphArray)
-
-        val toGlyphArray = IntArray(glyphCount) { -1 }
-        for (i in 0 until glyphCount) {
-            toGlyphArray[i] = buffer.getUint16(offset + 6 + i * 2)
+        val scriptTableOffset = getScriptTableOffset(buffer, scriptListOffset, script)
+        if (scriptTableOffset == -1) {
+            singleSubstitutionCache[key] = null
+            return null;
         }
+        val langSysTableOffset = getLangSysTableOffset(buffer,
+            scriptListOffset + scriptTableOffset, langSys)
+        if (langSysTableOffset == -1) {
+            singleSubstitutionCache[key] = null
+            return null;
+        }
+        val featureTableOffset = getFeatureTableOffset(buffer,
+            scriptListOffset + scriptTableOffset + langSysTableOffset,
+            featureListOffset, feature)
+        if (featureTableOffset == -1) {
+            singleSubstitutionCache[key] = null
+            return null;
+        }
+        val lookupIndices = getLookupIndices(buffer, featureListOffset + featureTableOffset)
+
+        val result = mutableMapOf<Int, Int>()
+        for (i in lookupIndices) {
+            val lookupTableOffset = getLookupTableOffset(buffer, i, lookupListOffset)
+            result.putAll(getSingleSubstitutionFromLookupTable1(buffer,
+                lookupListOffset + lookupTableOffset))
+        }
+        singleSubstitutionCache[key] = result
+        return result
     }
 
-    private fun readCoverage(buffer: ByteBuffer, offset: Int, glyphArray: IntArray) {
-        val format = buffer.getUint16(offset)
-        if (format == 1) {
-            val glyphCount = buffer.getUint16(offset + 2)
-            for (i in 0 until glyphCount) {
-                val glyphId = buffer.getUint16(offset + 4 + 2 * i)
-                glyphArray[i] = glyphId
-            }
-        } else if (format == 2) {
-            val rangeCount = buffer.getUint16(offset + 2)
-            for (i in 0 until rangeCount) {
-                val startGID = buffer.getUint16(offset + 4 + 6 * i)
-                val endGID = buffer.getUint16(offset + 4 + 6 * i + 2)
-                val startCoverageIndex = buffer.getUint16(offset + 4 + 6 * i + 4)
-                for (gID in startGID..endGID) {
-                    glyphArray[startCoverageIndex + gID - startGID] = gID
+    private companion object {
+
+        fun getScriptTableOffset(buffer: ByteBuffer, offset:Int, scriptTag: Int): Int {
+            val scriptCount = buffer.getUint16(offset)
+            for (i in 0 until scriptCount) {
+                val tag = buffer.getTag(offset + 2 + 6 * i)
+                if (tag == scriptTag) {
+                    return buffer.getUint16(offset + 2 + 6 * i + 4)
                 }
             }
-        } else {
-            throw NotImplementedError("Not implemented Coverage format = $format")
+            return -1
         }
-    }
 
+        fun getLangSysTableOffset(buffer: ByteBuffer, offset: Int, langSysTag: Int): Int {
+            val defaultLangSysOffset = buffer.getUint16(offset)
+            val langSysCount = buffer.getUint16(offset + 2)
+            for (i in 0 until langSysCount) {
+                val tag = buffer.getTag(offset + 4 + 6 * i)
+                if (tag == langSysTag) {
+                    return buffer.getUint16(offset + 4 + 6 * i + 4)
+                }
+            }
+            return -1
+        }
+
+        fun getFeatureTableOffset(buffer: ByteBuffer, offset: Int, featureListOffset: Int, featureTag: Int): Int {
+            val requiredFeatureIndex = buffer.getUint16(offset + 2)
+            val featureIndexCount = buffer.getUint16(offset + 4)
+            for (i in 0 until featureIndexCount) {
+                val index = buffer.getUint16(offset + 6 + 2 * i)
+                val tag = buffer.getTag(featureListOffset + 2 + 6 * index)
+                if (tag == featureTag) {
+                    return buffer.getUint16(featureListOffset + 2 + 6 * index + 4)
+                }
+            }
+            return -1
+        }
+
+        fun getLookupIndices(buffer: ByteBuffer, offset: Int): IntArray {
+            val featureParamsOffset = buffer.getUint16(offset)
+            val lookupIndexCount = buffer.getUint16(offset + 2)
+            val result = IntArray(lookupIndexCount)
+            for (i in 0 until lookupIndexCount) {
+                result[i] = buffer.getUint16(offset + 4 + 2 * i)
+            }
+            return result
+        }
+
+        fun getLookupTableOffset(buffer: ByteBuffer, index: Int, lookupListOffset: Int): Int {
+            return buffer.getUint16(lookupListOffset + 2 + 2 * index)
+        }
+
+        fun getSingleSubstitutionFromLookupTable1(buffer: ByteBuffer, offset: Int): Map<Int, Int> {
+            val lookupType = buffer.getUint16(offset)
+            if (lookupType != 1) {
+                throw IllegalArgumentException("LookupType must be 1 for single substitution")
+            }
+
+            val lookupFlag = buffer.getUint16(offset + 2)
+            val subTableCount = buffer.getUint16(offset + 4)
+            val result = mutableMapOf<Int, Int>()
+            for (i in 0 until subTableCount) {
+                val subtableOffset = buffer.getUint16(offset + 6 + i * 2)
+                val format = buffer.getUint16(offset + subtableOffset)
+                if (format == 1) {
+                    throw NotImplementedError("Not yet implemented format 1")
+                } else if (format == 2){
+                    result.putAll(readLookupTableType1Format2(buffer, offset + subtableOffset))
+                } else {
+                    throw IllegalArgumentException("Unknown format value: $format")
+                }
+            }
+            return result
+        }
+
+        fun readLookupTableType1Format2(buffer: ByteBuffer, offset: Int): Map<Int, Int> {
+            val coverageOffset = buffer.getUint16(offset + 2)
+            val glyphCount = buffer.getInt16(offset + 4)
+            val fromGlyphArray = IntArray(glyphCount)
+            readCoverage(buffer, offset + coverageOffset, fromGlyphArray)
+            val result = mutableMapOf<Int, Int>()
+
+            for (i in 0 until glyphCount) {
+                result[fromGlyphArray[i]] = buffer.getUint16(offset + 6 + i * 2)
+            }
+            return result
+        }
+
+        fun readCoverage(buffer: ByteBuffer, offset: Int, glyphArray: IntArray) {
+            val format = buffer.getUint16(offset)
+            if (format == 1) {
+                val glyphCount = buffer.getUint16(offset + 2)
+                for (i in 0 until glyphCount) {
+                    val glyphId = buffer.getUint16(offset + 4 + 2 * i)
+                    glyphArray[i] = glyphId
+                }
+            } else if (format == 2) {
+                val rangeCount = buffer.getUint16(offset + 2)
+                for (i in 0 until rangeCount) {
+                    val startGID = buffer.getUint16(offset + 4 + 6 * i)
+                    val endGID = buffer.getUint16(offset + 4 + 6 * i + 2)
+                    val startCoverageIndex = buffer.getUint16(offset + 4 + 6 * i + 4)
+                    for (gID in startGID..endGID) {
+                        glyphArray[startCoverageIndex + gID - startGID] = gID
+                    }
+                }
+            } else {
+                throw NotImplementedError("Not implemented Coverage format = $format")
+            }
+        }
+
+    }
 }
 
 object OpenTypeUtils {
@@ -336,3 +388,7 @@ private fun ByteBuffer.putTag(value: Int) = putInt(value)
 private fun ByteBuffer.putTag(i: Int, value: Int) = putInt(i, value)
 
 private fun Int.round4Up() = (this + 3) and 3.inv()
+
+private fun String.toTag(): Int {
+    return ((get(0).code and 0xFF) shl 24) or ((get(1).code and 0xFF) shl 16) or ((get(2).code and 0xFF) shl 8) or ((get(3).code and 0xFF) shl 0)
+}

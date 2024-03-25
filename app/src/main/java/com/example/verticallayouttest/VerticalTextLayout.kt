@@ -13,6 +13,7 @@ class VerticalTextLayout(
     val paint: Paint,
     val glyphs: PositionedGlyphs,
     val otCache: HashMap<Font, OpenType>,
+    val glyphIds: IntArray,
     val vAdvances: FloatArray,
 ) {
 
@@ -25,15 +26,20 @@ class VerticalTextLayout(
 
             val otCache = HashMap<Font, OpenType>()
             val vAdvances = FloatArray(glyphs.glyphCount())
+            val glyphIds = IntArray(glyphs.glyphCount())
 
             for (i in 0 until glyphs.glyphCount()) {
                 val font = glyphs.getFont(i)
                 val ot = otCache.getOrPut(font) { OpenTypeUtils.parse(font.buffer, font.ttcIndex) }
-                vAdvances[i] = ot.verticalMetrics?.getVAdvance(glyphs.getGlyphId(i)) ?: 0f
+                val map = ot.glyphSubstitution?.getSingleSubstitution("kana", "JAN ", "vrt2")!!
+                val originalGlyphId = glyphs.getGlyphId(i)
+                val glyphId = map.getOrDefault(originalGlyphId, originalGlyphId)
+                glyphIds[i] = glyphId
+                vAdvances[i] = ot.verticalMetrics?.getVAdvance(glyphId) ?: 0f
                 vAdvances[i] *= paint.textSize
             }
 
-            return VerticalTextLayout(paint, glyphs, otCache, vAdvances)
+            return VerticalTextLayout(paint, glyphs, otCache, glyphIds, vAdvances)
         }
     }
 
@@ -48,7 +54,6 @@ class VerticalTextLayout(
 
         c.drawLine(baselineX, 0f, baselineX, c.height.toFloat(), baselinePaint)
 
-        val glyphIds = IntArray(glyphs.glyphCount()) { glyphs.getGlyphId(it) }
         val positions = FloatArray(glyphs.glyphCount() * 2)
         var prev = 0f
         for (i in 0 until glyphIds.size) {
