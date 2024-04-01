@@ -1,6 +1,7 @@
 package com.example.verticallayouttest
 
 import android.content.Context
+import android.content.pm.PackageManager
 import android.graphics.Canvas
 import android.graphics.Paint
 import androidx.appcompat.app.AppCompatActivity
@@ -24,7 +25,8 @@ class VerticalLayoutView @JvmOverloads constructor(
         textSize = 64f
     }
 
-    val layout= VerticalTextLayout.build("吾輩「わがはい」は猫である。", paint)
+    val text = "むかしむかし、とある国のある城に王さまが住んでいました。王さまはぴっかぴかの新しい服が大好きで、服を買うことばかりにお金を使っていました。王さまののぞむことといったら、いつもきれいな服を着て、みんなにいいなぁと言われることでした。戦いなんてきらいだし、おしばいだって面白くありません。だって、服を着られればそれでいいんですから。新しい服だったらなおさらです。一時間ごとに服を着がえて、みんなに見せびらかすのでした。ふつう、めしつかいに王さまはどこにいるのですか、と聞くと、「王さまは会議室にいらっしゃいます。」と言うものですが、ここの王さまはちがいます。「王さまは衣装いしょう部屋にいらっしゃいます。」と言うのです。"
+    val layout= VerticalTextLayout.build(text, paint)
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec)
@@ -48,6 +50,8 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
 
+        //packageManager.getPackageInfo("com.google.android.gms", PackageManager.GET_SIGNATURES)
+        packageManager.getPackageInfo("com.example.verticallayouttest", PackageManager.GET_SIGNATURES)
 
     }
 }

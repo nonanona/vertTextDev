@@ -99,7 +99,7 @@ class OpenTypeTable_hmtx(
         if (glyphId < numOfLongHoriMetrics) {
             return buffer.getUint16(offset + 4 * glyphId).toFloat() / metadata.upem.toFloat()
         } else {
-            return 0f
+            return buffer.getUint16(offset + 4 * (numOfLongHoriMetrics - 1)).toFloat() / metadata.upem.toFloat()
         }
     }
 }
