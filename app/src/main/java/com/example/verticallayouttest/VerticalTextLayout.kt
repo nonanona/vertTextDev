@@ -6,8 +6,8 @@ import android.graphics.Paint
 import android.graphics.fonts.Font
 import android.graphics.text.PositionedGlyphs
 import android.graphics.text.TextRunShaper
-import android.util.Log
-import java.util.IdentityHashMap
+import com.example.verticallayouttest.graphics.OpenType
+import com.example.verticallayouttest.graphics.OpenTypeUtils
 
 class VerticalTextLayout(
     val paint: Paint,

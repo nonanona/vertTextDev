@@ -5,27 +5,21 @@ import android.graphics.Typeface
 import android.graphics.fonts.Font
 import android.graphics.fonts.FontFamily
 import android.graphics.fonts.SystemFonts
-import android.graphics.text.PositionedGlyphs
 import android.graphics.text.TextRunShaper
 import java.text.BreakIterator
 import java.text.CharacterIterator
 import java.util.Collections
 import java.util.Locale
 
-class VerticalPaint{
+class VerticalTextMeasure {
     private val verticalFont: Font
     private val paint = Paint()
-    private val grBreaker = BreakIterator.getCharacterInstance()
     private val openType: OpenType
     private val vmtx: OpenTypeTable_vmtx
     private val vrt2: Map<Int, Int>
 
-    // Cached arrays
-    private var glyphIds = IntArray(100)
-    private var advances = FloatArray(100)
-    private var fonts = Array<Font?>(100) { null }
-
-    constructor(verticalFont: Font) {
+    constructor(verticalFont: Font, paint: Paint) {
+        this.paint.set(paint)
         this.verticalFont = verticalFont
         this.openType = OpenTypeUtils.parse(verticalFont.buffer, verticalFont.ttcIndex)
         this.vmtx = requireNotNull(this.openType.verticalMetrics)
@@ -34,7 +28,8 @@ class VerticalPaint{
         initPaint()
     }
 
-    constructor(locale: Locale) {
+    constructor(locale: Locale, paint: Paint) {
+        this.paint.set(paint)
         this.verticalFont = SystemFonts.getAvailableFonts()
             .filterNotNull()
             .first {
@@ -60,31 +55,10 @@ class VerticalPaint{
         ).build()
     }
 
-    private fun fillGlyph(glyphs: PositionedGlyphs) {
-        if (glyphIds.size >= glyphs.glyphCount()) {
-            glyphIds = IntArray(glyphs.glyphCount())
-            fonts = Array(glyphs.glyphCount()) { null }
-        }
-        for (i in 0 until glyphs.glyphCount()) {
-            glyphIds[i] = glyphs.getGlyphId(i)
-            val font = glyphs.getFont(i)
-            // Fast equality check.
-            val isVerticalFont =
-                (System.identityHashCode(font) == System.identityHashCode(verticalFont)) ||
-                        (font.buffer.capacity() == verticalFont.buffer.capacity())
-            if (isVerticalFont) {
-                fonts[i] = null
-            } else {
-                fonts[i] = font
-            }
-        }
-    }
-
     data class VerticalTextRunLayout(
         val glyphIds: IntArray,
-        val advances: FloatArray,
         val fonts: Array<Font>,
-    )
+        val charAdvances: FloatArray)
 
     fun layoutText(
         text: CharSequence,
@@ -108,11 +82,24 @@ class VerticalPaint{
                 font
             }
         }
-        val advances = FloatArray(glyphs.glyphCount()) {
-            vmtx.getVAdvance(glyphIds[it]) * paint.textSize
+        val advances = FloatArray(text.length)
+
+        val grIter = BreakIterator.getCharacterInstance()
+        grIter.text = StringCharacterIterator(text, start, end)
+        var i = grIter.first()
+        var gID = 0
+        while (i != BreakIterator.DONE) {
+            val next = grIter.next()
+            if (next == BreakIterator.DONE) {
+                break
+            }
+            if (i != next) {
+                advances[i] = vmtx.getVAdvance(glyphIds[gID++]) * paint.textSize
+            }
+            i = next
         }
 
-        return VerticalTextRunLayout(glyphIds, advances, fonts)
+        return VerticalTextRunLayout(glyphIds, fonts, advances)
     }
 
     private class StringCharacterIterator(
@@ -124,13 +111,32 @@ class VerticalPaint{
         override fun clone(): Any = StringCharacterIterator(cs, start, end, offset)
         override fun first(): Char = cs[start]
         override fun last(): Char = cs[end - 1]
-        override fun current(): Char = cs[offset]
-        override fun next(): Char = cs[++offset]
-        override fun previous(): Char = cs[--offset]
+        override fun current(): Char = if (offset == end) {
+            CharacterIterator.DONE
+        } else {
+            cs[offset]
+        }
+        override fun next(): Char = if (offset >= end - 1) {
+            offset = end
+            CharacterIterator.DONE
+        } else {
+            cs[++offset]
+        }
+        override fun previous(): Char = if (offset <= start){
+            offset = start
+            CharacterIterator.DONE
+        } else {
+            cs[--offset]
+        }
         override fun getBeginIndex(): Int = start
         override fun getEndIndex(): Int = end
         override fun getIndex(): Int = offset
-        override fun setIndex(position: Int): Char = cs[position].also{ offset = position }
+        override fun setIndex(position: Int): Char = if (position == end) {
+            CharacterIterator.DONE
+        } else {
+            offset = position
+            cs[position]
+        }
     }
 
 }

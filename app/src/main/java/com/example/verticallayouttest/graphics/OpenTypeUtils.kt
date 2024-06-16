@@ -1,10 +1,9 @@
-package com.example.verticallayouttest
+package com.example.verticallayouttest.graphics
 
 import android.util.Log
 import java.lang.IllegalArgumentException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.util.*
 
 private const val TAG_vmtx = 0x766d7478
 private const val TAG_vhea = 0x76686561
@@ -59,6 +58,35 @@ data class OpenType(
                 numOfLongVerMetrics,
                 metadata
             )
+        }
+    }
+
+    class OpenTypeTable_hhea(
+        val ascender: Float,
+        val descender: Float
+    )
+
+    val horizontalHeader: OpenTypeTable_hhea? by lazy {
+        val hheaOffset = tables[TAG_hhea]
+        if (hheaOffset == null) {
+            null
+        } else {
+            val hheaBuf = buffer.slice().order(ByteOrder.BIG_ENDIAN)
+            val ascender = hheaBuf.getInt16(hheaOffset + 4).toFloat()
+            val descender = hheaBuf.getInt16(hheaOffset + 6).toFloat()
+            OpenTypeTable_hhea(ascender / metadata.upem, descender / metadata.upem)
+        }
+    }
+
+    val verticalHeader: OpenTypeTable_hhea? by lazy {
+        val vheaOffset = tables[TAG_vhea]
+        if (vheaOffset == null) {
+            null
+        } else {
+            val vheaBuf = buffer.slice().order(ByteOrder.BIG_ENDIAN)
+            val ascender = vheaBuf.getInt16(vheaOffset + 4).toFloat()
+            val descender = vheaBuf.getInt16(vheaOffset + 6).toFloat()
+            OpenTypeTable_hhea(ascender / metadata.upem, descender / metadata.upem)
         }
     }
 
@@ -148,8 +176,10 @@ class OpenTypeTable_GSUB(
         val result = mutableMapOf<Int, Int>()
         for (i in lookupIndices) {
             val lookupTableOffset = getLookupTableOffset(buffer, i, lookupListOffset)
-            result.putAll(getSingleSubstitutionFromLookupTable1(buffer,
-                lookupListOffset + lookupTableOffset))
+            result.putAll(
+                getSingleSubstitutionFromLookupTable1(buffer,
+                lookupListOffset + lookupTableOffset)
+            )
         }
         singleSubstitutionCache[key] = result
         return result

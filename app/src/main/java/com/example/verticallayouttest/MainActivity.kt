@@ -7,8 +7,11 @@ import android.graphics.Paint
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.util.AttributeSet
+import android.util.Log
 import android.view.View
 import android.view.View.MeasureSpec
+import com.example.verticallayouttest.graphics.VerticalTextMeasure
+import java.util.Locale
 
 fun getModeString(mode: Int) =
     when (MeasureSpec.getMode(mode)) {
@@ -53,5 +56,16 @@ class MainActivity : AppCompatActivity() {
         //packageManager.getPackageInfo("com.google.android.gms", PackageManager.GET_SIGNATURES)
         packageManager.getPackageInfo("com.example.verticallayouttest", PackageManager.GET_SIGNATURES)
 
+        val vPaint = VerticalTextMeasure(Locale.JAPANESE, Paint().apply {
+            textSize = 48f
+        })
+        val text = "本日は晴天なり。Android🙂‍↔️がぎぐげご"
+        val runLayout = vPaint.layoutText(text, 0, text.length)
+        for (i in 0 until runLayout.fonts.size) {
+            Log.e("Debug", "Glyph[$i] = {${runLayout.glyphIds[i]}, ${runLayout.fonts[i]}")
+        }
+        runLayout.charAdvances.forEachIndexed { index, fl ->
+            Log.e("Debug", "Char[$index] = $fl")
+        }
     }
 }
