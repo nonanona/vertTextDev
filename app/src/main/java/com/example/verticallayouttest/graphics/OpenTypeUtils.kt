@@ -325,9 +325,6 @@ object OpenTypeUtils {
             tables.put(tableTag, offset)
         }
 
-        tables.forEach { key, value ->
-            Log.e("Debug", "${key.toTagString()} : ${String.format("0x%08x", value)}")
-        }
         return OpenType(buf.slice().order(ByteOrder.BIG_ENDIAN), tables, parseHeader(buf, tables[TAG_head]!!))
     }
 

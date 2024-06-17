@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.icu.lang.UCharacter
+import android.icu.lang.UProperty
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.util.AttributeSet
@@ -11,6 +13,7 @@ import android.util.Log
 import android.view.View
 import android.view.View.MeasureSpec
 import com.example.verticallayouttest.graphics.VerticalTextMeasure
+import com.example.verticallayouttest.graphics.VerticalTextUtils
 import java.util.Locale
 
 fun getModeString(mode: Int) =
@@ -66,6 +69,16 @@ class MainActivity : AppCompatActivity() {
         }
         runLayout.charAdvances.forEachIndexed { index, fl ->
             Log.e("Debug", "Char[$index] = $fl")
+        }
+
+        text.codePoints().forEach {
+            val prop = UCharacter.getIntPropertyValue(it, UProperty.VERTICAL_ORIENTATION)
+            Log.e("Debug", "${String(Character.toChars(it))} = $prop")
+        }
+
+        val res = VerticalTextUtils.analyzeVerticalOrientation(text)
+        for (run in res) {
+            Log.e("Debug", "${run.orientation}, len = ${run.length}")
         }
     }
 }
