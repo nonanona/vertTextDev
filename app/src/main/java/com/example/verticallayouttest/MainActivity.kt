@@ -12,6 +12,7 @@ import android.util.AttributeSet
 import android.util.Log
 import android.view.View
 import android.view.View.MeasureSpec
+import com.example.verticallayouttest.graphics.VerticalLayout
 import com.example.verticallayouttest.graphics.VerticalTextMeasure
 import com.example.verticallayouttest.graphics.VerticalTextUtils
 import java.util.Locale
@@ -32,7 +33,8 @@ class VerticalLayoutView @JvmOverloads constructor(
     }
 
     val text = "むかしむかし、とある国のある城に王さまが住んでいました。王さまはぴっかぴかの新しい服が大好きで、服を買うことばかりにお金を使っていました。王さまののぞむことといったら、いつもきれいな服を着て、みんなにいいなぁと言われることでした。戦いなんてきらいだし、おしばいだって面白くありません。だって、服を着られればそれでいいんですから。新しい服だったらなおさらです。一時間ごとに服を着がえて、みんなに見せびらかすのでした。ふつう、めしつかいに王さまはどこにいるのですか、と聞くと、「王さまは会議室にいらっしゃいます。」と言うものですが、ここの王さまはちがいます。「王さまは衣装いしょう部屋にいらっしゃいます。」と言うのです。"
-    val layout= VerticalTextLayout.build(text, paint)
+    //val layout= VerticalTextLayout.build(text, paint)
+
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec)
@@ -46,7 +48,13 @@ class VerticalLayoutView @JvmOverloads constructor(
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
 
-        layout.draw(canvas)
+        val vPaint = VerticalTextMeasure(Locale.JAPANESE)
+        val paint = Paint().apply {
+            textSize = 48f
+        }
+        val text = "本日は晴天なり。Android🙂‍↔️がぎぐげご"
+        val runLayout = vPaint.layoutText(text, 0, text.length, VerticalLayout.TextOrientation.Mixed, paint)
+        runLayout.draw(canvas, 100f, 0f, 0, text.length, paint)
     }
 }
 
@@ -59,26 +67,11 @@ class MainActivity : AppCompatActivity() {
         //packageManager.getPackageInfo("com.google.android.gms", PackageManager.GET_SIGNATURES)
         packageManager.getPackageInfo("com.example.verticallayouttest", PackageManager.GET_SIGNATURES)
 
-        val vPaint = VerticalTextMeasure(Locale.JAPANESE, Paint().apply {
+        val vPaint = VerticalTextMeasure(Locale.JAPANESE)
+        val text = "本日は晴天なり。Android🙂‍↔️がぎぐげご"
+        val runLayout = vPaint.layoutText(text, 0, text.length, VerticalLayout.TextOrientation.Mixed, Paint().apply {
             textSize = 48f
         })
-        val text = "本日は晴天なり。Android🙂‍↔️がぎぐげご"
-        val runLayout = vPaint.layoutText(text, 0, text.length)
-        for (i in 0 until runLayout.fonts.size) {
-            Log.e("Debug", "Glyph[$i] = {${runLayout.glyphIds[i]}, ${runLayout.fonts[i]}")
-        }
-        runLayout.charAdvances.forEachIndexed { index, fl ->
-            Log.e("Debug", "Char[$index] = $fl")
-        }
-
-        text.codePoints().forEach {
-            val prop = UCharacter.getIntPropertyValue(it, UProperty.VERTICAL_ORIENTATION)
-            Log.e("Debug", "${String(Character.toChars(it))} = $prop")
-        }
-
-        val res = VerticalTextUtils.analyzeVerticalOrientation(text)
-        for (run in res) {
-            Log.e("Debug", "${run.orientation}, len = ${run.length}")
-        }
+        Log.e("Debug", runLayout.toString())
     }
 }
