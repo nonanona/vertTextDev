@@ -8,6 +8,8 @@ import android.icu.lang.UCharacter
 import android.icu.lang.UProperty
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.text.SpannableString
+import android.text.Spanned
 import android.util.AttributeSet
 import android.util.Log
 import android.view.View
@@ -50,11 +52,19 @@ class VerticalLayoutView @JvmOverloads constructor(
 
         val vPaint = VerticalTextMeasure(Locale.JAPANESE)
         val paint = Paint().apply {
-            textSize = 48f
+            textSize = 72f
         }
         val text = "本日は晴天なり。Android🙂‍↔️がぎぐげご"
+        /*
+        val text = SpannableString("2022年12月7日にAB型の血液がなくなりました。").apply {
+            setSpan(VerticalLayout.TextCombineUprightSpan(), 0, 4, Spanned.SPAN_INCLUSIVE_EXCLUSIVE)
+            setSpan(VerticalLayout.TextCombineUprightSpan(), 5, 7, Spanned.SPAN_INCLUSIVE_EXCLUSIVE)
+            setSpan(VerticalLayout.TextCombineUprightSpan(), 8, 9, Spanned.SPAN_INCLUSIVE_EXCLUSIVE)
+        }
+
+         */
         val runLayout = vPaint.layoutText(text, 0, text.length, VerticalLayout.TextOrientation.Mixed, paint)
-        runLayout.draw(canvas, 100f, 0f, 0, text.length, paint)
+        runLayout.draw(canvas, 100f, 0f, paint)
 
         Log.e("Debug", runLayout.toString())
     }

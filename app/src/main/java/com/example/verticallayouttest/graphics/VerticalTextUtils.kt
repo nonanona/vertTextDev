@@ -3,6 +3,7 @@ package com.example.verticallayouttest.graphics
 import android.icu.lang.UCharacter
 import android.icu.lang.UCharacter.VerticalOrientation
 import android.icu.lang.UProperty
+import android.text.Spanned
 import com.example.verticallayouttest.graphics.VerticalLayout.TextOrientation
 import java.text.BreakIterator
 import java.text.CharacterIterator
@@ -40,11 +41,37 @@ object VerticalTextUtils {
             result.toTypedArray()
         }
 
+        val spanned = if (text is Spanned) text else {
+            processNonTateChuYoko(text, start, end, textOrientation, result)
+            return result.toTypedArray()
+        }
+
+        var spanI = 0
+        while (spanI < end) {
+            val next = spanned.nextSpanTransition(spanI, end, VerticalLayout.TextCombineUprightSpan::class.java)
+
+            val hasSpan = spanned.getSpans(spanI, next, VerticalLayout.TextCombineUprightSpan::class.java).isNotEmpty()
+
+            if (hasSpan) {
+                result.add(DrawOrientationRun(DrawOrientation.TateChuYoko, next - spanI))
+            } else {
+                processNonTateChuYoko(text, spanI, next, textOrientation, result)
+            }
+
+            spanI = next
+        }
+
+
+        return result.toTypedArray()
+    }
+
+    private fun processNonTateChuYoko(text: CharSequence, start: Int, end: Int, textOrientation: TextOrientation,
+             result: MutableList<DrawOrientationRun>) {
         val grIter = BreakIterator.getCharacterInstance()
         grIter.text = StringCharacterIterator(text, start, end)
 
         var prevProp = DrawOrientation.Rotate // unused init value
-        var prevStart = 0
+        var prevStart = start
         var i = start
         while (i < end) {
             val cp = Character.codePointAt(text, i)
@@ -53,7 +80,7 @@ object VerticalTextUtils {
             val prop = drawOrientation(textOrientation, vertOrientation)
             if (i == start) {
                 prevProp = prop
-                prevStart = 0
+                prevStart = start
             } else if (prevProp != prop) {
                 result.add(DrawOrientationRun(prevProp, i - prevStart))
                 prevProp = prop
@@ -64,7 +91,6 @@ object VerticalTextUtils {
         }
 
         result.add(DrawOrientationRun(prevProp, end - prevStart))
-        return result.toTypedArray()
     }
 
     class StringCharacterIterator(

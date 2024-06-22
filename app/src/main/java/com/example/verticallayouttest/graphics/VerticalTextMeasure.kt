@@ -74,6 +74,7 @@ class VerticalTextMeasure {
         val glyphIds = IntArray(glyphs.glyphCount())
         val fonts = Array(glyphs.glyphCount()) { verticalFont }
         val vAdvances = FloatArray(runEnd - runStart)
+        val tsbs = FloatArray(runEnd - runStart)
 
         val grIter = BreakIterator.getCharacterInstance()
         grIter.text = VerticalTextUtils.StringCharacterIterator(text, runStart, runEnd)
@@ -89,7 +90,9 @@ class VerticalTextMeasure {
                 val gID = glyphs.getGlyphId(outGlyphIndex)
                 glyphIds[outGlyphIndex] = vrt2[gID] ?: gID
                 fonts[outGlyphIndex] = checkFont(glyphs.getFont(outGlyphIndex))
-                vAdvances[i - runStart] = vmtx.getVAdvance(glyphIds[outGlyphIndex]) * paint.textSize
+                val (adv, tsb) = vmtx.getVAdvance(glyphIds[outGlyphIndex])
+                vAdvances[i - runStart] = adv * paint.textSize
+                tsbs[i - runStart] = tsb * paint.textSize
                 outGlyphIndex++
             }
             i = next
@@ -98,7 +101,7 @@ class VerticalTextMeasure {
         if (outGlyphIndex != glyphs.glyphCount()) {
             Log.e("Debug", "The Grapheme count doesn't match with glyph count. $outGlyphIndex v.s. ${glyphs.glyphCount()}")
         }
-        return OrientationRun(text, runStart, runEnd, glyphIds, fonts, vAdvances, hAdvances, DrawOrientation.Upright)
+        return UprightOrientationRun(text, runStart, runEnd, glyphIds, fonts, vAdvances, tsbs, hAdvances)
     }
 
     private fun layoutTextRunRotate(
@@ -111,7 +114,17 @@ class VerticalTextMeasure {
         val advances = FloatArray(runEnd - runStart)
         TextUtils.getChars(text, runStart, runEnd, chars, 0)
         paint.getTextRunAdvances(chars, 0, chars.size, 0, chars.size, false, advances, 0)
-        return OrientationRun(text, runStart, runEnd, null, null, null, advances, DrawOrientation.Rotate)
+        return RotateOrientationRun(text, runStart, runEnd, advances)
+    }
+
+    private fun layoutTextRunTateChuYoko(
+        text: CharSequence,
+        runStart: Int,
+        runEnd: Int,
+        paint: Paint,
+    ): OrientationRun {
+        val w = paint.measureText(text, runStart, runEnd)
+        return TateChuYokoOrientationRun(text, runStart, runEnd, paint.fontMetrics, w)
     }
 
     fun layoutText(
@@ -138,7 +151,9 @@ class VerticalTextMeasure {
                 DrawOrientation.Rotate -> {
                     result.add(layoutTextRunRotate(text, runStart, runEnd, paint))
                 }
-                DrawOrientation.TateChuYoko -> TODO()
+                DrawOrientation.TateChuYoko -> {
+                    result.add(layoutTextRunTateChuYoko(text, runStart, runEnd, paint))
+                }
             }
 
             runStart = runEnd
@@ -150,8 +165,8 @@ class VerticalTextMeasure {
             fm.ascent = -0.5f * paint.textSize
             fm.descent = 0.5f * paint.textSize
         } else {
-            fm.ascent = vhea.ascender * paint.textSize
-            fm.descent = vhea.descender * paint.textSize
+            fm.ascent = -vhea.ascender * paint.textSize
+            fm.descent = -vhea.descender * paint.textSize
         }
         fm.top = fm.ascent
         fm.bottom = fm.descent

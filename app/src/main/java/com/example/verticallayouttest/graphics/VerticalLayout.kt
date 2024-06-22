@@ -19,31 +19,4 @@ class VerticalLayout {
     class TextCombineUprightSpan
     class RubySpan(val text: String)
 
-    companion object {
-        private fun findFont(locale: Locale) = SystemFonts.getAvailableFonts()
-                .filterNotNull()
-                .first {
-                    var foundLocale = false
-                    for (i in 0 until it.localeList.size()) {
-                        if (it.localeList.get(i).language == locale.language) {
-                            foundLocale = true;
-                        }
-                    }
-                    foundLocale
-                }
-
-        fun build(
-            text: CharSequence,
-            start: Int = 0,
-            end: Int = text.length,
-            textOrientation: TextOrientation = TextOrientation.Mixed,
-            height: Float,
-            font: Font? = null,
-            paint: Paint
-        ) {
-
-        }
-    }
-
-
 }
