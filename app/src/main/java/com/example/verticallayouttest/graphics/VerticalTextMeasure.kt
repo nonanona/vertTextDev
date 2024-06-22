@@ -44,8 +44,6 @@ class VerticalTextMeasure {
             foundLocale
         })
 
-
-
     private fun checkFont(font: Font) : Font {
         val isVerticalFont =
             (System.identityHashCode(font) == System.identityHashCode(verticalFont)) ||
@@ -68,9 +66,14 @@ class VerticalTextMeasure {
     ): OrientationRun {
         val glyphs = shape(text, runStart, runEnd, paint)
 
+        val chars = CharArray(runEnd - runStart)
+        val hAdvances = FloatArray(runEnd - runStart)
+        TextUtils.getChars(text, runStart, runEnd, chars, 0)
+        paint.getTextRunAdvances(chars, 0, chars.size, 0, chars.size, false, hAdvances, 0)
+
         val glyphIds = IntArray(glyphs.glyphCount())
-        val fonts = Array<Font>(glyphs.glyphCount()) { verticalFont }
-        val advances = FloatArray(runEnd - runStart)
+        val fonts = Array(glyphs.glyphCount()) { verticalFont }
+        val vAdvances = FloatArray(runEnd - runStart)
 
         val grIter = BreakIterator.getCharacterInstance()
         grIter.text = VerticalTextUtils.StringCharacterIterator(text, runStart, runEnd)
@@ -86,16 +89,16 @@ class VerticalTextMeasure {
                 val gID = glyphs.getGlyphId(outGlyphIndex)
                 glyphIds[outGlyphIndex] = vrt2[gID] ?: gID
                 fonts[outGlyphIndex] = checkFont(glyphs.getFont(outGlyphIndex))
-                advances[i - runStart] = vmtx.getVAdvance(glyphIds[outGlyphIndex]) * paint.textSize
+                vAdvances[i - runStart] = vmtx.getVAdvance(glyphIds[outGlyphIndex]) * paint.textSize
                 outGlyphIndex++
             }
             i = next
         }
 
         if (outGlyphIndex != glyphs.glyphCount()) {
-            android.util.Log.e("Debug", "The Grapheme count doesn't match with glyph count. $outGlyphIndex v.s. ${glyphs.glyphCount()}")
+            Log.e("Debug", "The Grapheme count doesn't match with glyph count. $outGlyphIndex v.s. ${glyphs.glyphCount()}")
         }
-        return OrientationRun(text, runStart, runEnd, glyphIds, fonts, advances, DrawOrientation.Upright)
+        return OrientationRun(text, runStart, runEnd, glyphIds, fonts, vAdvances, hAdvances, DrawOrientation.Upright)
     }
 
     private fun layoutTextRunRotate(
@@ -108,7 +111,7 @@ class VerticalTextMeasure {
         val advances = FloatArray(runEnd - runStart)
         TextUtils.getChars(text, runStart, runEnd, chars, 0)
         paint.getTextRunAdvances(chars, 0, chars.size, 0, chars.size, false, advances, 0)
-        return OrientationRun(text, runStart, runEnd, null, null, advances, DrawOrientation.Rotate)
+        return OrientationRun(text, runStart, runEnd, null, null, null, advances, DrawOrientation.Rotate)
     }
 
     fun layoutText(
@@ -118,7 +121,6 @@ class VerticalTextMeasure {
         textOrientation: TextOrientation = TextOrientation.Mixed,
         paint: Paint,
     ) : IntrinsicVerticalLayout {
-        val originalTypeface = paint.typeface
         paint.typeface = this.verticalTypeface
 
         // Outputs
@@ -142,8 +144,19 @@ class VerticalTextMeasure {
             runStart = runEnd
         }
 
-        paint.typeface = originalTypeface
+        val fm = Paint.FontMetrics()
+        val vhea = openType.verticalHeader
+        if (vhea == null) {
+            fm.ascent = -0.5f * paint.textSize
+            fm.descent = 0.5f * paint.textSize
+        } else {
+            fm.ascent = vhea.ascender * paint.textSize
+            fm.descent = vhea.descender * paint.textSize
+        }
+        fm.top = fm.ascent
+        fm.bottom = fm.descent
 
-        return IntrinsicVerticalLayout(text, openType, result)
+
+        return IntrinsicVerticalLayout(text, openType, paint, fm, result)
     }
 }

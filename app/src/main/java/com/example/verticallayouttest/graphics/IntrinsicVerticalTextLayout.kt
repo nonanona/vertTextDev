@@ -18,10 +18,17 @@ class OrientationRun(
     val end: Int,
     val glyphIds: IntArray?,
     val fonts: Array<Font>?,
-    val charAdvances: FloatArray,
+    val vCharAdvances: FloatArray?,
+    val hCharAdvances: FloatArray,
     val drawOrientation: DrawOrientation
 ) {
-    val height: Float by lazy { charAdvances.sum() }
+    val height: Float by lazy {
+        when (drawOrientation) {
+            DrawOrientation.Rotate -> hCharAdvances.sum()
+            DrawOrientation.Upright -> vCharAdvances!!.sum()
+            DrawOrientation.TateChuYoko -> TODO()
+        }
+    }
 
     fun draw(canvas: Canvas, x: Float, y: Float, start: Int, end: Int, paint: Paint) {
         when (drawOrientation) {
@@ -38,6 +45,8 @@ class OrientationRun(
         if (glyphIds.isEmpty()) {
             return
         }
+
+        val vCharAdvances = vCharAdvances!!
 
         val drawPositions = FloatArray(40)
         val drawGlyphs = IntArray(20)
@@ -62,13 +71,15 @@ class OrientationRun(
             }
 
             x += 0f
-            y += charAdvances[charIndex++]
+            y += vCharAdvances[charIndex]
+            val w = hCharAdvances[charIndex]
 
-            while (charIndex < charAdvances.size && charAdvances[charIndex] == 0f) {
+            charIndex++
+            while (charIndex < vCharAdvances.size && vCharAdvances[charIndex] == 0f) {
                 charIndex++
             }
 
-            drawPositions[glyphIndex * 2] = x
+            drawPositions[glyphIndex * 2] = x - w / 2
             drawPositions[glyphIndex * 2 + 1] = y
             drawGlyphs[glyphIndex] = glyphIds[i]
             glyphIndex++
@@ -85,10 +96,12 @@ class OrientationRun(
     private fun drawRotate(canvas: Canvas, x: Float, y: Float, start: Int, end: Int, paint: Paint) {
         val fontMetrics = Paint.FontMetricsInt()
         paint.getFontMetricsInt(fontMetrics)
+        val width = fontMetrics.descent - fontMetrics.ascent
+        val shift = fontMetrics.ascent + width * 0.5f
         canvas.save()
         try {
             canvas.rotate(90f, x, y)
-            canvas.drawText(text, start, end, x, y - fontMetrics.descent, paint)
+            canvas.drawText(text, start, end, x, y - shift, paint)
         } finally {
             canvas.restore()
         }
@@ -98,6 +111,8 @@ class OrientationRun(
 class IntrinsicVerticalLayout(
     val text: CharSequence,
     val openType: OpenType,
+    val pant: Paint,
+    val metrics: Paint.FontMetrics,
     val runs: List<OrientationRun>
 ) {
     override fun toString(): String {
@@ -110,7 +125,8 @@ class IntrinsicVerticalLayout(
                     out += "  { ${run.glyphIds[i]}, ${run.fonts!![i].file} }\n"
                 }
             }
-            run.charAdvances.forEachIndexed { j, advance ->
+
+            run.vCharAdvances?.forEachIndexed { j, advance ->
                 out += " $j: $advance, "
                 if (j % 8 == 7) {
                     out += "\n"
@@ -122,15 +138,17 @@ class IntrinsicVerticalLayout(
     }
 
 
-    val baselinePaint = Paint().apply {
+    val linePaint = Paint().apply {
         color = Color.GREEN
         strokeWidth = 5f
     }
 
-
     fun draw(canvas: Canvas, x: Float, y: Float, start: Int, end: Int, paint: Paint) {
 
-        canvas.drawLine(x, 0f, x, canvas.height.toFloat(), baselinePaint)
+        val cH = canvas.height.toFloat()
+        canvas.drawLine(x, 0f, x, cH, linePaint.apply { color = Color.GREEN })
+        canvas.drawLine(x - metrics.descent, 0f, x - metrics.descent, cH, linePaint.apply { color = Color.BLUE })
+        canvas.drawLine(x - metrics.ascent, 0f, x - metrics.ascent, cH, linePaint.apply { color = Color.RED })
 
         var x = x
         var y = y

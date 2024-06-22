@@ -55,6 +55,8 @@ class VerticalLayoutView @JvmOverloads constructor(
         val text = "本日は晴天なり。Android🙂‍↔️がぎぐげご"
         val runLayout = vPaint.layoutText(text, 0, text.length, VerticalLayout.TextOrientation.Mixed, paint)
         runLayout.draw(canvas, 100f, 0f, 0, text.length, paint)
+
+        Log.e("Debug", runLayout.toString())
     }
 }
 
@@ -67,11 +69,5 @@ class MainActivity : AppCompatActivity() {
         //packageManager.getPackageInfo("com.google.android.gms", PackageManager.GET_SIGNATURES)
         packageManager.getPackageInfo("com.example.verticallayouttest", PackageManager.GET_SIGNATURES)
 
-        val vPaint = VerticalTextMeasure(Locale.JAPANESE)
-        val text = "本日は晴天なり。Android🙂‍↔️がぎぐげご"
-        val runLayout = vPaint.layoutText(text, 0, text.length, VerticalLayout.TextOrientation.Mixed, Paint().apply {
-            textSize = 48f
-        })
-        Log.e("Debug", runLayout.toString())
     }
 }
