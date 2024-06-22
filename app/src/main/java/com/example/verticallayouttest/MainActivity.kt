@@ -14,9 +14,10 @@ import android.util.AttributeSet
 import android.util.Log
 import android.view.View
 import android.view.View.MeasureSpec
-import com.example.verticallayouttest.graphics.VerticalLayout
+import com.example.verticallayouttest.graphics.RubySpan
+import com.example.verticallayouttest.graphics.TextCombineUprightSpan
+import com.example.verticallayouttest.graphics.TextOrientation
 import com.example.verticallayouttest.graphics.VerticalTextMeasure
-import com.example.verticallayouttest.graphics.VerticalTextUtils
 import java.util.Locale
 
 fun getModeString(mode: Int) =
@@ -54,16 +55,14 @@ class VerticalLayoutView @JvmOverloads constructor(
         val paint = Paint().apply {
             textSize = 72f
         }
-        val text = "本日は晴天なり。Android🙂‍↔️がぎぐげご"
-        /*
+        //val text = "本日は晴天なり。Android🙂‍↔️がぎぐげご"
         val text = SpannableString("2022年12月7日にAB型の血液がなくなりました。").apply {
-            setSpan(VerticalLayout.TextCombineUprightSpan(), 0, 4, Spanned.SPAN_INCLUSIVE_EXCLUSIVE)
-            setSpan(VerticalLayout.TextCombineUprightSpan(), 5, 7, Spanned.SPAN_INCLUSIVE_EXCLUSIVE)
-            setSpan(VerticalLayout.TextCombineUprightSpan(), 8, 9, Spanned.SPAN_INCLUSIVE_EXCLUSIVE)
+            setSpan(TextCombineUprightSpan(), 0, 4, Spanned.SPAN_INCLUSIVE_EXCLUSIVE)
+            setSpan(TextCombineUprightSpan(), 5, 7, Spanned.SPAN_INCLUSIVE_EXCLUSIVE)
+            setSpan(TextCombineUprightSpan(), 8, 9, Spanned.SPAN_INCLUSIVE_EXCLUSIVE)
+            setSpan(RubySpan("アルティメット"), 15, 17, Spanned.SPAN_INCLUSIVE_EXCLUSIVE)
         }
-
-         */
-        val runLayout = vPaint.layoutText(text, 0, text.length, VerticalLayout.TextOrientation.Mixed, paint)
+        val runLayout = vPaint.layoutText(text, 0, text.length, TextOrientation.Mixed, paint)
         runLayout.draw(canvas, 100f, 0f, paint)
 
         Log.e("Debug", runLayout.toString())

@@ -6,14 +6,41 @@ import android.graphics.Paint
 import android.graphics.Paint.FontMetrics
 import android.graphics.fonts.Font
 import android.util.Log
+import kotlin.math.max
+
+object DebugPaints {
+    const val DEBUG = false
+    val drawOffsetPaint = Paint().apply {
+        color = Color.BLUE
+    }
+    val bboxPaint = Paint().apply {
+        color = Color.BLACK
+        style = Paint.Style.STROKE
+        strokeWidth = 3f
+    }
+    val baselinePaint = Paint().apply {
+        color = Color.GREEN
+        style = Paint.Style.STROKE
+        strokeWidth = 3f
+    }
+    val ascentPaint = Paint().apply {
+        color = Color.valueOf(1f, 0f, 0f, 0.3f).toArgb()
+        style = Paint.Style.FILL
+    }
+    val descentPaint = Paint().apply {
+        color = Color.valueOf(0f, 0f, 1f, 0.3f).toArgb()
+        style = Paint.Style.FILL
+    }
+}
 
 enum class DrawOrientation {
     Upright,
     Rotate,
     TateChuYoko,
+    Ruby,
 }
 
-sealed class OrientationRun(
+sealed class VerticalLayoutRun(
     val text: CharSequence,
     val start: Int,
     val end: Int
@@ -23,13 +50,47 @@ sealed class OrientationRun(
     abstract fun draw(canvas: Canvas, x: Float, y: Float, paint: Paint, vMetrics: FontMetrics)
 }
 
-class TateChuYokoOrientationRun(
+class RubyVerticalLayoutRun(
+    text: CharSequence,
+    start: Int,
+    end: Int,
+    val contentsRun: IntrinsicVerticalLayout,
+    val rubySpan: RubySpan,
+    val rubyRun: IntrinsicVerticalLayout
+): VerticalLayoutRun(text, start, end) {
+    override val height: Float by lazy {
+        max(contentsRun.height, rubyRun.height)
+    }
+
+    override fun draw(canvas: Canvas, x: Float, y: Float, paint: Paint, vMetrics: FontMetrics) {
+        val contentHeight = contentsRun.height
+        val rubyHeight = rubyRun.height
+
+        var contentY = y
+        var rubyY = y
+        if (contentHeight > rubyHeight) {
+            rubyY += (contentHeight - rubyHeight) / 2
+        } else {
+            contentY += (rubyHeight - contentHeight) / 2
+        }
+
+        contentsRun.draw(canvas, x, contentY, paint)
+
+        val originalTextSize = paint.textSize
+        paint.textSize *= rubySpan.textScale
+        rubyRun.draw(canvas, x - contentsRun.vMetrics.ascent + rubyRun.vMetrics.descent, rubyY, paint)
+        paint.textSize = originalTextSize
+
+    }
+}
+
+class TateChuYokoVerticalLayoutRun(
     text: CharSequence,
     start: Int,
     end: Int,
     val metrics: FontMetrics,
     val width: Float,
-) : OrientationRun(text, start, end) {
+) : VerticalLayoutRun(text, start, end) {
     override val height: Float by lazy {
         metrics.descent - metrics.ascent
     }
@@ -40,44 +101,62 @@ class TateChuYokoOrientationRun(
         if (width < paint.textSize * 1.1f) {
             val w = vMetrics.descent - vMetrics.ascent
             x += (w - width) / 2
+            if (DebugPaints.DEBUG) {
+                canvas.drawRect(x, y, x + width, y + metrics.ascent, DebugPaints.ascentPaint)
+                canvas.drawRect(x, y, x + width, y + metrics.descent, DebugPaints.descentPaint)
+                canvas.drawCircle(x, y, 5f, DebugPaints.drawOffsetPaint)
+                canvas.drawLine(x, y, x + width, y, DebugPaints.baselinePaint)
+            }
             canvas.drawText(text, start, end, x, y, paint)
         } else {
             x -= paint.textSize * 0.05f
             val originalScaleX = paint.textScaleX
             paint.textScaleX = 1.1f * paint.textSize / width
+            if (DebugPaints.DEBUG) {
+                canvas.drawRect(x, y, x + 1.1f * paint.textSize, y + metrics.ascent, DebugPaints.ascentPaint)
+                canvas.drawRect(x, y, x + 1.1f * paint.textSize, y + metrics.descent, DebugPaints.descentPaint)
+                canvas.drawCircle(x, y, 5f, DebugPaints.drawOffsetPaint)
+                canvas.drawLine(x, y, x + 1.1f * paint.textSize, y, DebugPaints.baselinePaint)
+            }
             canvas.drawText(text, start, end, x, y, paint)
             paint.textScaleX = originalScaleX
         }
     }
-
 }
 
-class RotateOrientationRun(
+class RotateVerticalLayoutRun(
     text: CharSequence,
     start: Int,
     end: Int,
     val hCharAdvances: FloatArray
-) : OrientationRun(text, start, end) {
+) : VerticalLayoutRun(text, start, end) {
     override val height: Float by lazy {
         hCharAdvances.sum()
     }
 
     override fun draw(canvas: Canvas, x: Float, y: Float, paint: Paint, vMetrics: FontMetrics) {
-        val fontMetrics = Paint.FontMetricsInt()
-        paint.getFontMetricsInt(fontMetrics)
-        val width = fontMetrics.descent - fontMetrics.ascent
-        val shift = fontMetrics.ascent + width * 0.5f
+        val metrics = PaintCompat.getFontMetricsInt(paint, text, start, end)
+        val width = metrics.descent - metrics.ascent
+        val shift = metrics.ascent + width * 0.5f
+        var y = y - shift
         canvas.save()
         try {
-            canvas.rotate(90f, x, y)
-            canvas.drawText(text, start, end, x, y - shift, paint)
+            canvas.rotate(90f, x, y + shift)
+            if (DebugPaints.DEBUG) {
+                canvas.drawRect(x, y, x + hCharAdvances.sum(), y + metrics.ascent, DebugPaints.ascentPaint)
+                canvas.drawRect(x, y, x + hCharAdvances.sum(), y + metrics.descent, DebugPaints.descentPaint)
+
+                canvas.drawLine(x, y, x + hCharAdvances.sum(), y, DebugPaints.baselinePaint)
+                canvas.drawCircle(x, y, 5f, DebugPaints.drawOffsetPaint)
+            }
+            canvas.drawText(text, start, end, x, y, paint)
         } finally {
             canvas.restore()
         }
     }
 }
 
-class UprightOrientationRun(
+class UprightVerticalLayoutRun(
     text: CharSequence,
     start: Int,
     end: Int,
@@ -86,7 +165,7 @@ class UprightOrientationRun(
     val vCharAdvances: FloatArray,
     val vCharTsb: FloatArray,
     val hCharAdvances: FloatArray,
-) : OrientationRun(text, start, end) {
+) : VerticalLayoutRun(text, start, end) {
     override val height: Float by lazy {
         vCharAdvances.sum()
     }
@@ -94,6 +173,12 @@ class UprightOrientationRun(
     override fun draw(canvas: Canvas, x: Float, y: Float, paint: Paint, vMetrics: FontMetrics) {
         if (glyphIds.isEmpty()) {
             return
+        }
+
+        if (DebugPaints.DEBUG) {
+            canvas.drawRect(x, y, x - vMetrics.ascent, y + height, DebugPaints.ascentPaint)
+            canvas.drawRect(x, y, x - vMetrics.descent, y + height, DebugPaints.descentPaint)
+            canvas.drawLine(x, y, x, y + height, DebugPaints.baselinePaint)
         }
 
         val drawPositions = FloatArray(40)
@@ -118,23 +203,25 @@ class UprightOrientationRun(
                 glyphIndex = 0
             }
 
-            /*
-            canvas.drawRect(
-                x - hCharAdvances[charIndex] / 2,
-                y,
-                x + hCharAdvances[charIndex] / 2,
-                y + vCharAdvances[charIndex],
-                linePaint)
-
-             */
-
-            x += 0f
-            y += vCharAdvances[charIndex]
             val tsb = vCharTsb[charIndex]
             val w = hCharAdvances[charIndex]
 
+            x += 0f
+            y += vCharAdvances[charIndex]
+
+            if (DebugPaints.DEBUG) {
+                canvas.drawRect(
+                    x - w / 2,
+                    y,
+                    x + w / 2,
+                    y - vCharAdvances[charIndex],
+                    DebugPaints.bboxPaint
+                )
+                canvas.drawCircle(x - w / 2, y, 5f, DebugPaints.drawOffsetPaint)
+            }
+
             drawPositions[glyphIndex * 2] = x - w / 2
-            drawPositions[glyphIndex * 2 + 1] = y
+            drawPositions[glyphIndex * 2 + 1] = y  - tsb
             drawGlyphs[glyphIndex] = glyphIds[i]
             glyphIndex++
 
@@ -159,7 +246,7 @@ class IntrinsicVerticalLayout(
     val openType: OpenType,
     val pant: Paint,
     val vMetrics: Paint.FontMetrics,
-    val runs: List<OrientationRun>
+    val runs: List<VerticalLayoutRun>
 ) {
     val linePaint = Paint().apply {
         color = Color.GREEN
@@ -190,4 +277,7 @@ class IntrinsicVerticalLayout(
         get() = runs.first().start
     val end: Int
         get() = runs.last().end
+
+    val height: Float
+        get() = runs.fold(0f) { acc, run -> acc + run.height }
 }

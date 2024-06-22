@@ -8,15 +8,15 @@ import android.icu.lang.UProperty
 import android.os.LocaleList
 import java.util.Locale
 
-class VerticalLayout {
-
-    enum class TextOrientation {
-        Mixed,
-        Upright,
-        Sideways,
-    }
-
-    class TextCombineUprightSpan
-    class RubySpan(val text: String)
-
+enum class TextOrientation {
+    Mixed,
+    Upright,
+    Sideways,
 }
+
+class TextCombineUprightSpan
+class RubySpan(
+    val text: CharSequence,
+    val orientation: TextOrientation = TextOrientation.Mixed,
+    val textScale: Float = 0.5f
+)

@@ -6,10 +6,8 @@ import android.graphics.fonts.Font
 import android.graphics.fonts.FontFamily
 import android.graphics.fonts.SystemFonts
 import android.graphics.text.TextRunShaper
-import android.icu.lang.UCharacter.VerticalOrientation
 import android.text.TextUtils
 import android.util.Log
-import com.example.verticallayouttest.graphics.VerticalLayout.TextOrientation
 import java.text.BreakIterator
 import java.util.Collections
 import java.util.Locale
@@ -63,7 +61,7 @@ class VerticalTextMeasure {
         runStart: Int,
         runEnd: Int,
         paint: Paint,
-    ): OrientationRun {
+    ): UprightVerticalLayoutRun {
         val glyphs = shape(text, runStart, runEnd, paint)
 
         val chars = CharArray(runEnd - runStart)
@@ -101,7 +99,7 @@ class VerticalTextMeasure {
         if (outGlyphIndex != glyphs.glyphCount()) {
             Log.e("Debug", "The Grapheme count doesn't match with glyph count. $outGlyphIndex v.s. ${glyphs.glyphCount()}")
         }
-        return UprightOrientationRun(text, runStart, runEnd, glyphIds, fonts, vAdvances, tsbs, hAdvances)
+        return UprightVerticalLayoutRun(text, runStart, runEnd, glyphIds, fonts, vAdvances, tsbs, hAdvances)
     }
 
     private fun layoutTextRunRotate(
@@ -109,12 +107,12 @@ class VerticalTextMeasure {
         runStart: Int,
         runEnd: Int,
         paint: Paint,
-    ): OrientationRun {
+    ): RotateVerticalLayoutRun {
         val chars = CharArray(runEnd - runStart)
         val advances = FloatArray(runEnd - runStart)
         TextUtils.getChars(text, runStart, runEnd, chars, 0)
         paint.getTextRunAdvances(chars, 0, chars.size, 0, chars.size, false, advances, 0)
-        return RotateOrientationRun(text, runStart, runEnd, advances)
+        return RotateVerticalLayoutRun(text, runStart, runEnd, advances)
     }
 
     private fun layoutTextRunTateChuYoko(
@@ -122,9 +120,27 @@ class VerticalTextMeasure {
         runStart: Int,
         runEnd: Int,
         paint: Paint,
-    ): OrientationRun {
+    ): TateChuYokoVerticalLayoutRun {
         val w = paint.measureText(text, runStart, runEnd)
-        return TateChuYokoOrientationRun(text, runStart, runEnd, paint.fontMetrics, w)
+        return TateChuYokoVerticalLayoutRun(text, runStart, runEnd, paint.fontMetrics, w)
+    }
+
+    private fun layoutTextRunRuby(
+        text: CharSequence,
+        runStart: Int,
+        runEnd: Int,
+        paint: Paint,
+        contentRuns: List<VerticalTextUtils.DrawOrientationRun>,
+        rubySpan: RubySpan,
+        rubyTextRuns: List<VerticalTextUtils.DrawOrientationRun>
+    ): VerticalLayoutRun {
+        val contentLayouts = layoutTextWithDrawRuns(text, runStart, runEnd, paint, contentRuns)
+        val originalTextSize = paint.textSize
+        paint.textSize *= rubySpan.textScale
+        val rubyLayouts = layoutTextWithDrawRuns(rubySpan.text, 0, rubySpan.text.length, paint, rubyTextRuns)
+        paint.textSize = originalTextSize
+
+        return RubyVerticalLayoutRun(text, runStart, runEnd, contentLayouts, rubySpan, rubyLayouts)
     }
 
     fun layoutText(
@@ -134,30 +150,19 @@ class VerticalTextMeasure {
         textOrientation: TextOrientation = TextOrientation.Mixed,
         paint: Paint,
     ) : IntrinsicVerticalLayout {
+        val drawRuns = VerticalTextUtils.analyzeVerticalOrientation(text, start, end, textOrientation)
+        return layoutTextWithDrawRuns(text, start, end, paint, drawRuns)
+    }
+
+    private fun layoutTextWithDrawRuns(
+        text: CharSequence,
+        start: Int,
+        end: Int,
+        paint: Paint,
+        drawRuns: List<VerticalTextUtils.DrawOrientationRun>,
+    ) : IntrinsicVerticalLayout {
         paint.typeface = this.verticalTypeface
-
-        // Outputs
-        val result = mutableListOf<OrientationRun>()
-
-        val vertRuns = VerticalTextUtils.analyzeVerticalOrientation(text, start, end, textOrientation)
-        var runStart = start
-        for (run in vertRuns) {
-            val runEnd = runStart + run.length
-
-            when (run.drawOrientation) {
-                DrawOrientation.Upright -> {
-                    result.add(layoutTextRunUpright(text, runStart, runEnd, paint))
-                }
-                DrawOrientation.Rotate -> {
-                    result.add(layoutTextRunRotate(text, runStart, runEnd, paint))
-                }
-                DrawOrientation.TateChuYoko -> {
-                    result.add(layoutTextRunTateChuYoko(text, runStart, runEnd, paint))
-                }
-            }
-
-            runStart = runEnd
-        }
+        val result = measureRuns(text, start, end, drawRuns, paint)
 
         val fm = Paint.FontMetrics()
         val vhea = openType.verticalHeader
@@ -171,7 +176,37 @@ class VerticalTextMeasure {
         fm.top = fm.ascent
         fm.bottom = fm.descent
 
-
         return IntrinsicVerticalLayout(text, openType, paint, fm, result)
+    }
+
+    private fun measureRuns(text: CharSequence, start: Int, end: Int,
+                            drawRuns: List<VerticalTextUtils.DrawOrientationRun>,
+                            paint: Paint): List<VerticalLayoutRun> {
+        val result = mutableListOf<VerticalLayoutRun>()
+
+        var runStart = start
+        for (run in drawRuns) {
+            val runEnd = runStart + run.length
+
+            when (run.orientation) {
+                DrawOrientation.Upright -> {
+                    result.add(layoutTextRunUpright(text, runStart, runEnd, paint))
+                }
+                DrawOrientation.Rotate -> {
+                    result.add(layoutTextRunRotate(text, runStart, runEnd, paint))
+                }
+                DrawOrientation.TateChuYoko -> {
+                    result.add(layoutTextRunTateChuYoko(text, runStart, runEnd, paint))
+                }
+                DrawOrientation.Ruby -> {
+                    val rubyRun = run as VerticalTextUtils.RubyDrawOrientationRun
+                    result.add(layoutTextRunRuby(text, runStart, runEnd, paint,
+                        rubyRun.contentRuns, rubyRun.rubySpan, rubyRun.rubyRuns))
+                }
+            }
+
+            runStart = runEnd
+        }
+        return result
     }
 }
