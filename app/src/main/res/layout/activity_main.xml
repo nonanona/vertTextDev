@@ -7,9 +7,10 @@
     tools:context=".MainActivity">
 
     <com.example.verticallayouttest.VerticalLayoutView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
         android:text="Hello World!"
+        android:id="@+id/mainView"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"

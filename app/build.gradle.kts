@@ -37,7 +37,7 @@ android {
 }
 
 dependencies {
-
+    implementation("org.jsoup:jsoup:1.15.3")
     implementation(libs.core.ktx)
     implementation(libs.appcompat)
     implementation(libs.material)

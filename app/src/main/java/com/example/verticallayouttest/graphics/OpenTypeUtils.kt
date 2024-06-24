@@ -1,9 +1,8 @@
 package com.example.verticallayouttest.graphics
 
-import android.util.Log
-import java.lang.IllegalArgumentException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import kotlin.IllegalArgumentException
 
 private const val TAG_vmtx = 0x766d7478
 private const val TAG_vhea = 0x76686561
@@ -15,6 +14,7 @@ private const val TAG_vert = 0x76657274
 private const val TAG_vrt2 = 0x76727432
 private const val TAG_kana = 0x6B616E61
 private const val TAG_JAN_ = 0x4A414E20
+private const val TAG_cmap = 0x636D6170
 
 data class Metadata(
     val upem: Int
@@ -61,11 +61,6 @@ data class OpenType(
         }
     }
 
-    class OpenTypeTable_hhea(
-        val ascender: Float,
-        val descender: Float
-    )
-
     val horizontalHeader: OpenTypeTable_hhea? by lazy {
         val hheaOffset = tables[TAG_hhea]
         if (hheaOffset == null) {
@@ -100,19 +95,33 @@ data class OpenType(
                 gsubOffset)
         }
     }
-}
 
+    val charMap: OpenTypeTable_cmap by lazy {
+        OpenTypeTable_cmap(
+            buffer.slice().order(ByteOrder.BIG_ENDIAN),
+            requireNotNull(tables[TAG_cmap])
+        )
+    }
+}
+class OpenTypeTable_hhea(
+    val ascender: Float,
+    val descender: Float
+)
 class OpenTypeTable_vmtx(
     private val buffer: ByteBuffer,
     private val offset: Int,
     private val numOfLongVerMetrics: Int,
     private val metadata: Metadata
 ) {
-    fun getVAdvance(glyphId: Int): Float {
+    fun getVAdvance(glyphId: Int): Pair<Float, Float> {
         if (glyphId < numOfLongVerMetrics) {
-            return buffer.getUint16(offset + 4 * glyphId).toFloat() / metadata.upem.toFloat()
+            val tsb = buffer.getInt16(offset + 4 * glyphId + 2) / metadata.upem.toFloat()
+            val adv = buffer.getUint16(offset + 4 * glyphId).toFloat() / metadata.upem.toFloat()
+            return Pair(adv, tsb)
         } else {
-            return buffer.getUint16(offset + 4 * (numOfLongVerMetrics - 1)).toFloat() / metadata.upem.toFloat()
+            val tsb = buffer.getInt16(offset + 4 * numOfLongVerMetrics + (glyphId - numOfLongVerMetrics) * 2) / metadata.upem.toFloat()
+            val adv = buffer.getUint16(offset + 4 * (numOfLongVerMetrics - 1)).toFloat() / metadata.upem.toFloat()
+            return Pair(adv, tsb)
         }
     }
 }
@@ -129,6 +138,48 @@ class OpenTypeTable_hmtx(
         } else {
             return buffer.getUint16(offset + 4 * (numOfLongHoriMetrics - 1)).toFloat() / metadata.upem.toFloat()
         }
+    }
+}
+
+class OpenTypeTable_cmap(
+    private val buffer: ByteBuffer,
+    offset: Int
+) {
+    private val cmapOffset = getPreferredCmapOffset(offset)
+
+    fun getGlyphId(codePoint: Int): Int {
+        require(buffer.getUint16(cmapOffset) == 12)
+        require(buffer.getUint16(cmapOffset + 2) == 0)
+        val numGroups = buffer.getUint32AsInt32Safe(cmapOffset + 12)
+
+        // TODO: binary search
+        for (i in 0 until numGroups) {
+            val startCharCode = buffer.getUint32AsInt32Safe(cmapOffset + 16 + i * 12)
+            val endCharCode = buffer.getUint32AsInt32Safe(cmapOffset + 16 + i * 12 + 4)
+            val startGlyphId = buffer.getUint32AsInt32Safe(cmapOffset + 16 + i * 12 + 8)
+
+            if (codePoint in startCharCode..endCharCode) { // inc-inc
+                return (startGlyphId + (codePoint - startCharCode))
+            }
+        }
+        return 0 // 0 is reserved for no-glyph ID
+    }
+
+    private fun getPreferredCmapOffset(offset: Int): Int {
+        buffer.position(offset)
+
+        val numTables = buffer.getUint16(offset + 2)
+
+        for (i in 0 until numTables) {
+            val platformId = buffer.getUint16(offset + 4 + 8 * i)
+            val encodingId = buffer.getUint16(offset + 4 + 8 * i + 2)
+            val subTableOffset = buffer.getUint32AsInt32Safe(offset + 4 + 8 * i + 4)
+
+            if (platformId == 3 && encodingId == 10) {
+                return offset + subTableOffset
+            }
+        }
+        throw IllegalArgumentException("platform ID == 3 and encoding ID == 10 not found")
     }
 }
 
@@ -298,6 +349,8 @@ class OpenTypeTable_GSUB(
 
     }
 }
+
+
 
 object OpenTypeUtils {
     fun parse(fontBuffer: ByteBuffer, index: Int): OpenType {

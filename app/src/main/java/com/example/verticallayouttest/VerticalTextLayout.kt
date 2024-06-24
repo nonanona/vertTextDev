@@ -42,7 +42,7 @@ class VerticalTextLayout(
                     val originalGlyphId = glyphs.getGlyphId(i)
                     val glyphId = map.getOrDefault(originalGlyphId, originalGlyphId)
                     glyphIds[i] = glyphId
-                    vAdvances[i] = ot.verticalMetrics?.getVAdvance(glyphId) ?: 0f
+                    vAdvances[i] = ot.verticalMetrics?.getVAdvance(glyphId)?.first ?: 0f
                     vAdvances[i] *= paint.textSize
                     hAdvances[i] = ot.horizontalMetrics?.getHAdvance(glyphId) ?: 0f
                     hAdvances[i] *= paint.textSize
