@@ -4,9 +4,6 @@ import android.icu.lang.UCharacter
 import android.icu.lang.UCharacter.VerticalOrientation
 import android.icu.lang.UProperty
 import android.text.Spanned
-import com.nona.verticallayout.graphics.TextOrientation
-import java.text.BreakIterator
-import java.text.CharacterIterator
 
 object VerticalTextUtils {
 
@@ -111,9 +108,6 @@ object VerticalTextUtils {
 
     private fun processNonTateChuYoko(text: CharSequence, start: Int, end: Int, textOrientation: TextOrientation,
                                       result: MutableList<DrawOrientationRun>) {
-        val grIter = BreakIterator.getCharacterInstance()
-        grIter.text = StringCharacterIterator(text, start, end)
-
         var prevProp = DrawOrientation.Rotate // unused init value
         var prevStart = start
         var i = start
@@ -136,7 +130,7 @@ object VerticalTextUtils {
                 prevStart = i
             }
 
-            i = grIter.following(i)
+            i += Character.charCount(cp)
         }
 
         val run = when (prevProp) {
@@ -145,42 +139,5 @@ object VerticalTextUtils {
             else -> throw RuntimeException("Unreachable code")
         }
         result.add(run)
-    }
-
-    class StringCharacterIterator(
-        val cs: CharSequence,
-        val start: Int,
-        val end: Int,
-        var offset: Int = start
-    ) : CharacterIterator {
-        override fun clone(): Any = StringCharacterIterator(cs, start, end, offset)
-        override fun first(): Char = cs[start]
-        override fun last(): Char = cs[end - 1]
-        override fun current(): Char = if (offset == end) {
-            CharacterIterator.DONE
-        } else {
-            cs[offset]
-        }
-        override fun next(): Char = if (offset >= end - 1) {
-            offset = end
-            CharacterIterator.DONE
-        } else {
-            cs[++offset]
-        }
-        override fun previous(): Char = if (offset <= start){
-            offset = start
-            CharacterIterator.DONE
-        } else {
-            cs[--offset]
-        }
-        override fun getBeginIndex(): Int = start
-        override fun getEndIndex(): Int = end
-        override fun getIndex(): Int = offset
-        override fun setIndex(position: Int): Char = if (position == end) {
-            CharacterIterator.DONE
-        } else {
-            offset = position
-            cs[position]
-        }
     }
 }
