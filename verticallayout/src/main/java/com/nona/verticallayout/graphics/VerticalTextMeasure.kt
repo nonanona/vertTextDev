@@ -175,7 +175,7 @@ class VerticalTextMeasure {
         fm.top = fm.ascent
         fm.bottom = fm.descent
 
-        return IntrinsicVerticalLayout(text, start, end, fm, result)
+        return IntrinsicVerticalLayout(text, start, end, fm, result, paint)
     }
 
     private fun measureRuns(text: CharSequence, start: Int, end: Int,

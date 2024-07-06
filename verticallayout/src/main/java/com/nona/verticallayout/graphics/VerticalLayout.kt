@@ -7,6 +7,7 @@ import android.graphics.fonts.SystemFonts
 import android.icu.lang.UCharacter
 import android.icu.lang.UProperty
 import android.os.LocaleList
+import android.util.Log
 import java.util.Locale
 
 enum class TextOrientation {
@@ -22,37 +23,63 @@ class RubySpan(
     val textScale: Float = 0.5f
 )
 
-class VerticalLayout(
+class VerticalLayout private constructor(
     val text: CharSequence,
-    val lines: List<VerticalLine>
+    val lines: List<VerticalLineMetrics>,
+    val lineLayouts: List<VerticalLine>
 ) {
 
     fun draw(canvas: Canvas, x: Float, y: Float, paint: Paint) {
-        var x = x
+        if (lineLayouts.isEmpty()) {
+            Log.e("Debug", "Need to calculate full layout for drawing")
+        }
+        for (i in lines.indices) {
+            lineLayouts[i].draw(canvas, x + lines[i].baseline, y, paint)
+        }
         lines.forEach { it ->
-            val verticalMetrics = it.verticalMetrics(paint)
-            x -= verticalMetrics.right
-            it.draw(canvas, x, y, paint)
-            x -= verticalMetrics.left
+
         }
     }
 
     companion object {
-        fun build(text: CharSequence, start: Int, end: Int, orientation: TextOrientation, paint: Paint, height: Float) : VerticalLayout {
-            val lines = mutableListOf<VerticalLine>()
+        fun build(text: CharSequence,
+                  start: Int,
+                  end: Int,
+                  orientation: TextOrientation,
+                  paint: Paint,
+                  height: Float,
+                  computeFullLayout: Boolean = true,
+        ) : VerticalLayout {
+            val lines = mutableListOf<VerticalLineMetrics>()
+            val layouts = mutableListOf<VerticalLine>()
 
             val measure = VerticalTextMeasure(Locale.JAPANESE)
 
-            var paraStart = 0
+            var baseline = 0f
+            var paraStart = start
             while (paraStart < end) {
                 val paraEnd = text.indexOf('\n', paraStart + 1).let { if (it == -1) end else it }
 
                 val intrinsic = measure.layoutText(text, paraStart, paraEnd, orientation, paint)
-                lines.addAll(VerticalLine.breakLine(intrinsic, height))
+                val paraLines = VerticalLine.breakLine(intrinsic, height, baseline)
 
+                if (computeFullLayout) {
+                    for (i in paraLines.indices) {
+                        val lineStart = paraLines[i].offset
+                        val lineEnd = if (i == paraLines.size - 1) {
+                            paraEnd
+                        } else {
+                            paraLines[i + 1].offset
+                        }
+                        layouts.add(VerticalLine.layoutLine(lineStart, lineEnd, intrinsic))
+                    }
+                }
+
+                lines.addAll(paraLines)
+                baseline = paraLines.last().let { it.baseline - it.left  }
                 paraStart = paraEnd
             }
-            return VerticalLayout(text, lines)
+            return VerticalLayout(text, lines, layouts)
         }
     }
 }

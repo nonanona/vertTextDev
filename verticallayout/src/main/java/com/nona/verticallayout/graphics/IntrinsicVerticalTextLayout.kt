@@ -4,8 +4,10 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Paint.FontMetrics
 import android.graphics.fonts.Font
+import android.util.Log
 import com.nona.verticallayout.graphics.debug.DebugPaints
 import kotlin.math.max
+import kotlin.math.min
 
 enum class DrawOrientation {
     Upright,
@@ -30,7 +32,9 @@ sealed class VerticalLayoutRun(
 
     abstract fun draw(canvas: Canvas, x: Float, y: Float, paint: Paint, vMetrics: VerticalFontMetrics)
 
-    abstract fun split(height: Float): Pair<VerticalLayoutRun, VerticalLayoutRun>?
+    abstract fun split(startOuter: Int, height: Float): Pair<VerticalLayoutRun, VerticalLayoutRun>?
+    abstract fun split(startOuter: Int, endOuter: Int): VerticalLayoutRun?
+    abstract fun breakAt(startOuter: Int, height: Float): Pair<Int, Float>  // break offset, consumed height
 }
 
 class RubyVerticalLayoutRun(
@@ -66,7 +70,14 @@ class RubyVerticalLayoutRun(
     }
 
     // Don't break line inside Ruby.
-    override fun split(height: Float): Pair<VerticalLayoutRun, VerticalLayoutRun>? = null
+    override fun split(startOuter: Int, height: Float): Pair<VerticalLayoutRun, VerticalLayoutRun>? = null
+    override fun split(startOuter: Int, endOuter: Int): VerticalLayoutRun? {
+        if (startOuter == start && endOuter == end) {
+            return this
+        }
+        return null
+    }
+    override fun breakAt(start: Int, height: Float): Pair<Int, Float> = Pair(-1, 0f)
 
     override fun verticalMetrics(paint: Paint): VerticalFontMetrics =
         VerticalFontMetrics(paint.textSize * 0.5f, paint.textSize)
@@ -116,7 +127,14 @@ class TateChuYokoVerticalLayoutRun(
     }
 
     // Don't break line inside TateChuYoko.
-    override fun split(height: Float): Pair<VerticalLayoutRun, VerticalLayoutRun>? = null
+    override fun split(startOuter: Int, height: Float): Pair<VerticalLayoutRun, VerticalLayoutRun>? = null
+    override fun split(startOuter: Int, endOuter: Int): VerticalLayoutRun? {
+        if (startOuter == start && endOuter == end) {
+            return this
+        }
+        return null
+    }
+    override fun breakAt(start: Int, height: Float): Pair<Int, Float> = Pair(-1, 0f)
 
     override fun verticalMetrics(paint: Paint): VerticalFontMetrics =
         VerticalFontMetrics(paint.textSize * 0.55f, paint.textSize * 0.55f)
@@ -158,10 +176,17 @@ class RotateVerticalLayoutRun(
         }
     }
 
-    override fun split(height: Float): Pair<VerticalLayoutRun, VerticalLayoutRun>? {
+    override fun split(startOuter: Int, height: Float): Pair<VerticalLayoutRun, VerticalLayoutRun>? {
         // TODO: Implement line break for Rotate run.
         return null
     }
+    override fun split(startOuter: Int, endOuter: Int): VerticalLayoutRun? {
+        if (startOuter == start && endOuter == end) {
+            return this
+        }
+        return null
+    }
+    override fun breakAt(start: Int, height: Float): Pair<Int, Float> = Pair(-1, 0f)
 
     override fun verticalMetrics(paint: Paint): VerticalFontMetrics =
         VerticalFontMetrics(paint.textSize * 0.5f, paint.textSize * 0.5f)
@@ -250,35 +275,57 @@ class UprightVerticalLayoutRun(
             paint)
     }
 
-    override fun split(height: Float): Pair<VerticalLayoutRun, VerticalLayoutRun>? {
+    override fun split(startOuter: Int, height: Float): Pair<VerticalLayoutRun, VerticalLayoutRun>? {
+        val startInner = startOuter - start
+        val (breakIndexOuter, _) = breakAt(startOuter, height)
+        if (breakIndexOuter == -1) {
+            return null
+        }
+        val breakIndexInner = breakIndexOuter - start
+        val current = UprightVerticalLayoutRun(
+            text, startOuter, breakIndexOuter,
+            glyphIds.slice(startInner until breakIndexInner).toIntArray(),
+            fonts.slice(startInner until breakIndexInner).toTypedArray(),
+            vCharAdvances.slice(startInner until breakIndexInner).toFloatArray(),
+            hCharAdvances.slice(startInner until breakIndexInner).toFloatArray()
+        )
+        val next = UprightVerticalLayoutRun(
+            text, start + breakIndexInner, end,
+            glyphIds.slice(breakIndexInner until glyphIds.size).toIntArray(),
+            fonts.slice(breakIndexInner until glyphIds.size).toTypedArray(),
+            vCharAdvances.slice(breakIndexInner until glyphIds.size).toFloatArray(),
+            hCharAdvances.slice(breakIndexInner until glyphIds.size).toFloatArray()
+        )
+        return Pair(current, next)
+    }
+    override fun split(startOuter: Int, endOuter: Int): VerticalLayoutRun? {
+        val startInner = startOuter - start
+        val endInner = endOuter - start
+        return UprightVerticalLayoutRun(
+            text, startOuter, endInner,
+            glyphIds.slice(startInner until endInner).toIntArray(),
+            fonts.slice(startInner until endInner).toTypedArray(),
+            vCharAdvances.slice(startInner until endInner).toFloatArray(),
+            hCharAdvances.slice(startInner until endInner).toFloatArray()
+        )
+    }
+
+    override fun breakAt(startOuter: Int, height: Float): Pair<Int, Float> {
         var remaining = height
-        for (i in 0 until vCharAdvances.size) {
+        val startInner = startOuter - start
+        for (i in startInner until vCharAdvances.size) {
             val vChar = vCharAdvances[i]
             if (remaining < vChar) {
-                if (i == 0) {
-                    return null // Unable to fit only one char.
+                return if (i == 0) {
+                    Pair(-1, 0f) // Unable to fit only one char.
                 } else {
-                    val current = UprightVerticalLayoutRun(
-                        text, start, start + i,
-                        glyphIds.slice(0 until i).toIntArray(),
-                        fonts.slice(0 until i).toTypedArray(),
-                        vCharAdvances.slice(0 until i).toFloatArray(),
-                        hCharAdvances.slice(0 until i).toFloatArray()
-                    )
-                    val next = UprightVerticalLayoutRun(
-                        text, start + i, end,
-                        glyphIds.slice(i until glyphIds.size).toIntArray(),
-                        fonts.slice(i until glyphIds.size).toTypedArray(),
-                        vCharAdvances.slice(i until glyphIds.size).toFloatArray(),
-                        hCharAdvances.slice(i until glyphIds.size).toFloatArray()
-                    )
-                    return Pair(current, next)
+                    Pair(start + i, height - remaining)
                 }
             } else {
                 remaining -= vChar
             }
         }
-        return null
+        return Pair(-1, 0f)
     }
 
     override fun verticalMetrics(paint: Paint): VerticalFontMetrics =
@@ -294,7 +341,8 @@ class IntrinsicVerticalLayout(
     val start: Int,
     val end: Int,
     val vMetrics: Paint.FontMetrics,
-    val runs: List<VerticalLayoutRun>
+    val runs: List<VerticalLayoutRun>,
+    val paint: Paint,
 ) {
     fun draw(canvas: Canvas, x: Float, y: Float, paint: Paint) {
         var x = x
@@ -314,6 +362,13 @@ class IntrinsicVerticalLayout(
         return runs.fold("") { acc, it -> "$acc,$it" }
     }
 }
+
+class VerticalLineMetrics(
+    val offset: Int,
+    val left: Float,
+    val right: Float,
+    val baseline: Float,
+)
 
 class VerticalLine(
     val text: CharSequence,
@@ -342,40 +397,71 @@ class VerticalLine(
     }
 
     companion object {
-        fun breakLine(layout: IntrinsicVerticalLayout, height: Float): List<VerticalLine> {
-            val result = mutableListOf<VerticalLine>()
-            var lineRuns = mutableListOf<VerticalLayoutRun>()
+
+        fun breakLine(layout: IntrinsicVerticalLayout, height: Float, x: Float): List<VerticalLineMetrics> {
+            val result = mutableListOf<VerticalLineMetrics>()
             var lineStart = layout.start
+            var baseline = x
+            var left = 0f
+            var right = 0f
 
             var curHeight = 0f
             for (i in 0 until layout.runs.size) {
-                var run = layout.runs[i]
+                val run = layout.runs[i]
+                var runStart = run.start
+                var runHeight = run.height
+                val vRunMetrics = run.verticalMetrics(layout.paint)
+                left = max(left, vRunMetrics.left)
+                right = max(right, vRunMetrics.right)
 
-                while (curHeight + run.height > height) {
-                    val lineBreak = run.split(height - curHeight)
-                    if (lineBreak == null) {
-                        result.add(VerticalLine(layout.text, lineRuns))
-                        lineRuns = mutableListOf()
+                while (curHeight + runHeight > height) {
+                    val (breakIndex, consumed) = run.breakAt(runStart, height - curHeight)
+                    if (breakIndex == -1) {
+                        baseline -= right
+                        result.add(VerticalLineMetrics(lineStart, left, right, baseline))
+                        baseline -= left
                         lineStart = run.start
                         curHeight = 0f
+                        left = vRunMetrics.left
+                        right = vRunMetrics.right
                         break
                     } else {
-                        val next = lineBreak.second
-
-                        lineRuns.add(lineBreak.first)
-                        result.add(VerticalLine(layout.text, lineRuns))
-                        lineRuns = mutableListOf()
+                        baseline -= right
+                        result.add(VerticalLineMetrics(lineStart, left, right, baseline))
+                        baseline -= left
+                        lineStart = breakIndex
+                        runStart = breakIndex
                         curHeight = 0f
-                        lineStart = next.start
-                        run = next
+                        runHeight -= consumed
+                        left = vRunMetrics.left
+                        right = vRunMetrics.right
+
                     }
                 }
-
-                lineRuns.add(run)
-                curHeight += run.height
+                curHeight += runHeight
             }
-            result.add(VerticalLine(layout.text, lineRuns))
+            baseline -= right
+            result.add(VerticalLineMetrics(lineStart, left, right, baseline))
             return result
+        }
+
+        fun layoutLine(start: Int, end: Int, layout: IntrinsicVerticalLayout): VerticalLine {
+            val lineRuns = mutableListOf<VerticalLayoutRun>()
+
+            for (i in 0 until layout.runs.size) {
+                val run = layout.runs[i]
+                if (end < run.start) {
+                    break
+                }
+
+                val intersectStart = max(start, run.start)
+                val intersectEnd = min(end, run.end)
+                if (intersectStart < intersectEnd) {
+                    lineRuns.add(run.split(intersectStart, intersectEnd)!!)
+                }
+            }
+
+            return VerticalLine(layout.text, lineRuns)
         }
     }
 }
