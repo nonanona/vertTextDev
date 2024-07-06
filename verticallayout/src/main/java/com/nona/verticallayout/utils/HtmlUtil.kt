@@ -24,7 +24,6 @@ object HtmlUtil {
         }
     }
 
-
     fun flattenNodeToText(node: Node, out: StringBuilder? = null): String {
         val out = out ?: StringBuilder()
 
@@ -106,6 +105,6 @@ object HtmlUtil {
                 }
             }
         }
-        return SpannedString(ssb)
+        return ssb
     }
 }

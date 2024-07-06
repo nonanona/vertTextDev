@@ -200,7 +200,6 @@ class UprightVerticalLayoutRun(
     val glyphIds: IntArray,
     val fonts: Array<Font?>,
     val vCharAdvances: FloatArray,
-    val vCharTsb: FloatArray,
     val hCharAdvances: FloatArray,
 ) : VerticalLayoutRun(text, start, end) {
     override val height: Float by lazy {
@@ -243,7 +242,6 @@ class UprightVerticalLayoutRun(
             }
 
             val w = hCharAdvances[charIndex]
-            val tsb = vCharTsb[charIndex]
 
             x += 0f
             y += vCharAdvances[charIndex]
@@ -291,7 +289,6 @@ class UprightVerticalLayoutRun(
                         glyphIds.slice(0 until i).toIntArray(),
                         fonts.slice(0 until i).toTypedArray(),
                         vCharAdvances.slice(0 until i).toFloatArray(),
-                        vCharTsb.slice(0 until i).toFloatArray(),
                         hCharAdvances.slice(0 until i).toFloatArray()
                     )
                     val next = UprightVerticalLayoutRun(
@@ -299,7 +296,6 @@ class UprightVerticalLayoutRun(
                         glyphIds.slice(i until glyphIds.size).toIntArray(),
                         fonts.slice(i until glyphIds.size).toTypedArray(),
                         vCharAdvances.slice(i until glyphIds.size).toFloatArray(),
-                        vCharTsb.slice(i until glyphIds.size).toFloatArray(),
                         hCharAdvances.slice(i until glyphIds.size).toFloatArray()
                     )
                     return Pair(current, next)
@@ -315,7 +311,7 @@ class UprightVerticalLayoutRun(
         VerticalFontMetrics(paint.textSize * 0.5f, paint.textSize * 0.5f)
 
     override fun toString(): String {
-        return "UprightVerticalLayoutRun(glyphIds=${glyphIds.contentToString()}, fonts=${fonts.contentToString()}, vCharAdvances=${vCharAdvances.contentToString()}, vCharTsb=${vCharTsb.contentToString()}, hCharAdvances=${hCharAdvances.contentToString()}, height=$height)"
+        return "UprightVerticalLayoutRun(glyphIds=${glyphIds.contentToString()}, fonts=${fonts.contentToString()}, vCharAdvances=${vCharAdvances.contentToString()}, hCharAdvances=${hCharAdvances.contentToString()}, height=$height)"
     }
 }
 

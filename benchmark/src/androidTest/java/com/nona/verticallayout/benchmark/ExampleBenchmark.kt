@@ -47,6 +47,7 @@ class ExampleBenchmark {
         val paint = Paint().apply {
             textSize = 48f
         }
+        Log.e("Debug", "Text length: ${spanned.length}")
         benchmarkRule.measureRepeated {
             VerticalLayout.build(spanned, 0, spanned.length, TextOrientation.Mixed, paint, 2048f)
         }

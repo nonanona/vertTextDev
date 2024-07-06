@@ -116,15 +116,11 @@ class OpenTypeTable_vmtx(
     private val numOfLongVerMetrics: Int,
     private val metadata: Metadata
 ) {
-    fun getVAdvance(glyphId: Int): Pair<Float, Float> {
+    fun getVAdvance(glyphId: Int): Float {
         if (glyphId < numOfLongVerMetrics) {
-            val tsb = buffer.getInt16(offset + 4 * glyphId + 2) / metadata.upem.toFloat()
-            val adv = buffer.getUint16(offset + 4 * glyphId).toFloat() / metadata.upem.toFloat()
-            return Pair(adv, tsb)
+            return buffer.getUint16(offset + 4 * glyphId).toFloat() / metadata.upem.toFloat()
         } else {
-            val tsb = buffer.getInt16(offset + 4 * numOfLongVerMetrics + (glyphId - numOfLongVerMetrics) * 2) / metadata.upem.toFloat()
-            val adv = buffer.getUint16(offset + 4 * (numOfLongVerMetrics - 1)).toFloat() / metadata.upem.toFloat()
-            return Pair(adv, tsb)
+            return buffer.getUint16(offset + 4 * (numOfLongVerMetrics - 1)).toFloat() / metadata.upem.toFloat()
         }
     }
 }

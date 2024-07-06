@@ -73,7 +73,6 @@ class VerticalTextMeasure {
         val hAdvances = FloatArray(runEnd - runStart) { 0f }
         val vAdvances = FloatArray(runEnd - runStart) { 0f }
         val fonts = Array<Font?>(runEnd - runStart) { null }
-        val tsbs = FloatArray(runEnd - runStart)
 
         val hmtx = requireNotNull(openType.horizontalMetrics)
         val vmtx = requireNotNull(openType.verticalMetrics)
@@ -90,16 +89,15 @@ class VerticalTextMeasure {
             } else {
                 glyphIds[ai] = vrt2[glyphId] ?: glyphId
                 hAdvances[ai] = hmtx.getHAdvance(glyphId) * paint.textSize
-                val (vAdv, tsb) = vmtx.getVAdvance(glyphId)
+                val vAdv = vmtx.getVAdvance(glyphId)
                 vAdvances[ai] = vAdv * paint.textSize
-                tsbs[ai] = tsb * paint.textSize
                 fonts[ai] = verticalFont
             }
 
             ci += Character.charCount(cp)
         }
 
-        return UprightVerticalLayoutRun(text, runStart, runEnd, glyphIds, fonts, vAdvances, tsbs, hAdvances)
+        return UprightVerticalLayoutRun(text, runStart, runEnd, glyphIds, fonts, vAdvances, hAdvances)
     }
 
     private fun layoutTextRunRotate(
