@@ -1,10 +1,10 @@
-package com.example.verticallayouttest.graphics
+package com.nona.verticallayout.graphics
 
 import android.icu.lang.UCharacter
 import android.icu.lang.UCharacter.VerticalOrientation
 import android.icu.lang.UProperty
 import android.text.Spanned
-import com.example.verticallayouttest.graphics.TextOrientation
+import com.nona.verticallayout.graphics.TextOrientation
 import java.text.BreakIterator
 import java.text.CharacterIterator
 
@@ -45,7 +45,7 @@ object VerticalTextUtils {
         val contentRuns: List<DrawOrientationRun>,
         val rubySpan: RubySpan,
         val rubyRuns: List<DrawOrientationRun>
-    ) :DrawOrientationRun(DrawOrientation.Ruby, length)
+    ) : DrawOrientationRun(DrawOrientation.Ruby, length)
 
     fun analyzeVerticalOrientation(
         text: CharSequence,
@@ -110,7 +110,7 @@ object VerticalTextUtils {
     }
 
     private fun processNonTateChuYoko(text: CharSequence, start: Int, end: Int, textOrientation: TextOrientation,
-             result: MutableList<DrawOrientationRun>) {
+                                      result: MutableList<DrawOrientationRun>) {
         val grIter = BreakIterator.getCharacterInstance()
         grIter.text = StringCharacterIterator(text, start, end)
 

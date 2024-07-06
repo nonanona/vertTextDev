@@ -3,31 +3,13 @@ package com.example.verticallayouttest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.Paint
-import android.icu.lang.UCharacter
-import android.icu.lang.UProperty
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
-import android.text.SpannableString
-import android.text.SpannableStringBuilder
-import android.text.Spanned
-import android.text.SpannedString
 import android.util.AttributeSet
-import android.util.Log
 import android.view.View
 import android.view.View.MeasureSpec
-import com.example.verticallayouttest.graphics.IntrinsicVerticalLayout
-import com.example.verticallayouttest.graphics.RubySpan
-import com.example.verticallayouttest.graphics.TextCombineUprightSpan
-import com.example.verticallayouttest.graphics.TextOrientation
-import com.example.verticallayouttest.graphics.VerticalLayout
-import com.example.verticallayouttest.graphics.VerticalTextMeasure
-import org.jsoup.Jsoup
-import org.jsoup.nodes.Node
-import org.xmlpull.v1.XmlPullParser
-import org.xmlpull.v1.XmlPullParserFactory
-import java.io.StringReader
+import androidx.appcompat.app.AppCompatActivity
+import com.nona.verticallayout.utils.HtmlUtil.parseAsset
 import java.util.Locale
 
 fun getModeString(mode: Int) =
@@ -45,12 +27,12 @@ class VerticalLayoutView @JvmOverloads constructor(
     //val layout= VerticalTextLayout.build(text, paint)
 
     var text: CharSequence = ""
-    val vPaint = VerticalTextMeasure(Locale.JAPANESE)
+    val vPaint = com.nona.verticallayout.graphics.VerticalTextMeasure(Locale.JAPANESE)
     val paint = Paint().apply {
         //textSize = 72f
         textSize = 48f
     }
-    var runLayout: VerticalLayout? = null
+    var runLayout: com.nona.verticallayout.graphics.VerticalLayout? = null
 
 
     fun refreshText(text: CharSequence) {
@@ -64,7 +46,7 @@ class VerticalLayoutView @JvmOverloads constructor(
         super.onMeasure(widthMeasureSpec, heightMeasureSpec)
         val width = MeasureSpec.getSize(widthMeasureSpec)
         val height = MeasureSpec.getSize(heightMeasureSpec)
-        runLayout = VerticalLayout.build(text, 0, text.length, TextOrientation.Mixed, paint, height.toFloat())
+        runLayout = com.nona.verticallayout.graphics.VerticalLayout.build(text, 0, text.length, com.nona.verticallayout.graphics.TextOrientation.Mixed, paint, height.toFloat())
 
         //android.util.Log.e("Debug", "width = ${MeasureSpec.getSize(widthMeasureSpec)} (${getModeString(widthMeasureSpec)}), height = ${MeasureSpec.getSize(heightMeasureSpec)} (${getModeString(heightMeasureSpec)})")
     }
@@ -93,103 +75,9 @@ class VerticalLayoutView @JvmOverloads constructor(
     }
 }
 
-fun flattenNodeToText(node: Node, out: SpannableStringBuilder) {
-    when (node.nodeName()) {
-        "#text" -> {
-            out.append(node.toString().trim())
-        }
-        "br" -> {
-            out.append("\n")
-        }
-        else -> {
-            node.childNodes().forEach {
-                flattenNodeToText(it, out)
-            }
-        }
-    }
-}
 
-fun flattenNodeToText(node: Node, out: StringBuilder? = null): String {
-    val out = out ?: StringBuilder()
 
-    when (node.nodeName()) {
-        "#text" -> {
-            out.append(node.toString().trim())
-        }
-        "br" -> {
-            out.append("\n")
-        }
-        else -> {
-            node.childNodes().forEach {
-                flattenNodeToText(it, out)
-            }
-        }
-    }
-    return out.toString()
-}
 
-fun parseAsset(context: Context, path: String): CharSequence {
-    val text = context.assets.open(path).bufferedReader().use { it.readText() }
-
-    val ssb = SpannableStringBuilder()
-
-    val body = Jsoup.parse(text).body()
-    body.childNodes().forEachIndexed { i, node ->
-        when (node.nodeName()) {
-            "ruby" -> {
-                val rubyNode = node
-                val children = rubyNode.childNodes()
-
-                var rb: String? = null
-                var rt: String? = null
-
-                for (child in children) {
-                    when (child.nodeName()) {
-                        "rb" -> {
-                            if (rb != null) {
-                                if (rt != null) {
-                                    ssb.append(rb, RubySpan(rt), Spanned.SPAN_INCLUSIVE_EXCLUSIVE)
-                                }
-                                rb = null
-                                rt = null
-                            } else {
-                                rb = flattenNodeToText(child)
-                            }
-                        }
-                        "rt" -> {
-                            if (rt != null) {
-                                if (rb != null) {
-                                    ssb.append(rb, RubySpan(rt), Spanned.SPAN_INCLUSIVE_EXCLUSIVE)
-                                }
-                                rb = null
-                                rt = null
-                            } else {
-                                rt = flattenNodeToText(child)
-                            }
-
-                        }
-                        "rp" -> {
-                            // ignore
-                        }
-                    }
-                }
-                if (rb != null && rt != null) {
-                    ssb.append(rb, RubySpan(rt), Spanned.SPAN_INCLUSIVE_EXCLUSIVE)
-                }
-            }
-            "br" -> {
-                ssb.append("\n")
-            }
-            "#text" -> {
-                ssb.append(node.toString().trim( ))
-            }
-            else -> {
-                flattenNodeToText(node, ssb)
-            }
-        }
-    }
-    return SpannedString(ssb)
-}
 
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {

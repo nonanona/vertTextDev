@@ -1,4 +1,4 @@
-package com.example.verticallayouttest.graphics
+package com.nona.verticallayout.graphics
 
 import android.graphics.Canvas
 import android.graphics.Color
@@ -127,8 +127,12 @@ class TateChuYokoVerticalLayoutRun(
             val originalScaleX = paint.textScaleX
             paint.textScaleX = 1.1f * paint.textSize / width
             if (DebugPaints.DEBUG) {
-                canvas.drawRect(x, y, x + 1.1f * paint.textSize, y + metrics.ascent, DebugPaints.ascentPaint)
-                canvas.drawRect(x, y, x + 1.1f * paint.textSize, y + metrics.descent, DebugPaints.descentPaint)
+                canvas.drawRect(x, y, x + 1.1f * paint.textSize, y + metrics.ascent,
+                    DebugPaints.ascentPaint
+                )
+                canvas.drawRect(x, y, x + 1.1f * paint.textSize, y + metrics.descent,
+                    DebugPaints.descentPaint
+                )
                 canvas.drawCircle(x, y, 5f, DebugPaints.drawOffsetPaint)
                 canvas.drawLine(x, y, x + 1.1f * paint.textSize, y, DebugPaints.baselinePaint)
             }
@@ -164,8 +168,12 @@ class RotateVerticalLayoutRun(
         try {
             canvas.rotate(90f, x, y + shift)
             if (DebugPaints.DEBUG) {
-                canvas.drawRect(x, y, x + hCharAdvances.sum(), y + metrics.ascent, DebugPaints.ascentPaint)
-                canvas.drawRect(x, y, x + hCharAdvances.sum(), y + metrics.descent, DebugPaints.descentPaint)
+                canvas.drawRect(x, y, x + hCharAdvances.sum(), y + metrics.ascent,
+                    DebugPaints.ascentPaint
+                )
+                canvas.drawRect(x, y, x + hCharAdvances.sum(), y + metrics.descent,
+                    DebugPaints.descentPaint
+                )
 
                 canvas.drawLine(x, y, x + hCharAdvances.sum(), y, DebugPaints.baselinePaint)
                 canvas.drawCircle(x, y, 5f, DebugPaints.drawOffsetPaint)

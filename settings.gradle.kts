@@ -15,4 +15,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "VerticalLayoutTest"
 include(":app")
- 
+include(":verticallayout")

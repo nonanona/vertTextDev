@@ -1,4 +1,4 @@
-package com.example.verticallayouttest.graphics
+package com.nona.verticallayout.graphics
 
 import android.graphics.Canvas
 

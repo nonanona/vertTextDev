@@ -1,4 +1,4 @@
-package com.example.verticallayouttest.graphics
+package com.nona.verticallayout.graphics
 
 import android.graphics.Paint
 import android.graphics.Typeface
@@ -150,7 +150,8 @@ class VerticalTextMeasure {
         textOrientation: TextOrientation = TextOrientation.Mixed,
         paint: Paint,
     ) : IntrinsicVerticalLayout {
-        val drawRuns = VerticalTextUtils.analyzeVerticalOrientation(text, start, end, textOrientation)
+        val drawRuns =
+            VerticalTextUtils.analyzeVerticalOrientation(text, start, end, textOrientation)
         return layoutTextWithDrawRuns(text, start, end, paint, drawRuns)
     }
 
