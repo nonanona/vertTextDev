@@ -6,12 +6,15 @@ import androidx.benchmark.junit4.BenchmarkRule
 import androidx.benchmark.junit4.measureRepeated
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.nona.verticallayout.graphics.OpenTypeUtils
 import com.nona.verticallayout.graphics.TextOrientation
 import com.nona.verticallayout.graphics.VerticalLayout
+import com.nona.verticallayout.graphics.VerticalTextMeasure
 import com.nona.verticallayout.utils.HtmlUtil
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.util.Locale
 
 /**
  * Benchmark, which will execute on an Android device.
@@ -42,6 +45,19 @@ class ExampleBenchmark {
         }
         benchmarkRule.measureRepeated {
             VerticalLayout.build(spanned, 0, spanned.length, TextOrientation.Mixed, paint, 2048f)
+        }
+    }
+
+    @Test
+    fun getGlyphId() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val spanned = HtmlUtil.parseAsset(context, "wagahaihanekodearu.txt")
+        val vMeasure = VerticalTextMeasure(Locale.JAPANESE)
+        val ot = OpenTypeUtils.parse(vMeasure.verticalFont.buffer, vMeasure.verticalFont.ttcIndex)
+        benchmarkRule.measureRepeated {
+            spanned.codePoints().forEach { cp ->
+                ot.charMap.getGlyphId(cp)
+            }
         }
     }
 }
