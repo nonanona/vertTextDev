@@ -1,37 +1,11 @@
 package com.nona.verticallayout.graphics
 
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Paint.FontMetrics
 import android.graphics.fonts.Font
-import android.util.Log
+import com.nona.verticallayout.graphics.debug.DebugPaints
 import kotlin.math.max
-
-object DebugPaints {
-    const val DEBUG = false
-    val drawOffsetPaint = Paint().apply {
-        color = Color.BLUE
-    }
-    val bboxPaint = Paint().apply {
-        color = Color.BLACK
-        style = Paint.Style.STROKE
-        strokeWidth = 3f
-    }
-    val baselinePaint = Paint().apply {
-        color = Color.GREEN
-        style = Paint.Style.STROKE
-        strokeWidth = 3f
-    }
-    val ascentPaint = Paint().apply {
-        color = Color.valueOf(1f, 0f, 0f, 0.3f).toArgb()
-        style = Paint.Style.FILL
-    }
-    val descentPaint = Paint().apply {
-        color = Color.valueOf(0f, 0f, 1f, 0.3f).toArgb()
-        style = Paint.Style.FILL
-    }
-}
 
 enum class DrawOrientation {
     Upright,
@@ -343,8 +317,6 @@ class IntrinsicVerticalLayout(
 
 class VerticalLine(
     val text: CharSequence,
-    val lineStart: Int,
-    val lineEnd: Int,
     val runs: List<VerticalLayoutRun>
 ) {
     fun draw(canvas: Canvas, x: Float, y: Float, paint: Paint) {
@@ -382,7 +354,7 @@ class VerticalLine(
                 while (curHeight + run.height > height) {
                     val lineBreak = run.split(height - curHeight)
                     if (lineBreak == null) {
-                        result.add(VerticalLine(layout.text, lineStart, run.start, lineRuns))
+                        result.add(VerticalLine(layout.text, lineRuns))
                         lineRuns = mutableListOf()
                         lineStart = run.start
                         curHeight = 0f
@@ -391,7 +363,7 @@ class VerticalLine(
                         val next = lineBreak.second
 
                         lineRuns.add(lineBreak.first)
-                        result.add(VerticalLine(layout.text, lineStart, next.start, lineRuns))
+                        result.add(VerticalLine(layout.text, lineRuns))
                         lineRuns = mutableListOf()
                         curHeight = 0f
                         lineStart = next.start
@@ -402,7 +374,7 @@ class VerticalLine(
                 lineRuns.add(run)
                 curHeight += run.height
             }
-            result.add(VerticalLine(layout.text, lineStart, layout.end, lineRuns))
+            result.add(VerticalLine(layout.text, lineRuns))
             return result
         }
     }

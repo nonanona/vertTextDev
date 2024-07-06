@@ -24,8 +24,6 @@ class RubySpan(
 
 class VerticalLayout(
     val text: CharSequence,
-    val start: Int,
-    val end: Int,
     val lines: List<VerticalLine>
 ) {
 
@@ -33,11 +31,8 @@ class VerticalLayout(
         var x = x
         lines.forEach { it ->
             val verticalMetrics = it.verticalMetrics(paint)
-
             x -= verticalMetrics.right
-
             it.draw(canvas, x, y, paint)
-
             x -= verticalMetrics.left
         }
     }
@@ -57,7 +52,7 @@ class VerticalLayout(
 
                 paraStart = paraEnd
             }
-            return VerticalLayout(text, start, end, lines)
+            return VerticalLayout(text, lines)
         }
     }
 }
