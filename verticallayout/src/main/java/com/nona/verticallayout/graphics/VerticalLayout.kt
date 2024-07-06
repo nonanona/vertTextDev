@@ -53,7 +53,6 @@ class VerticalLayout(
                 val paraEnd = text.indexOf('\n', paraStart + 1).let { if (it == -1) end else it }
 
                 val intrinsic = measure.layoutText(text, paraStart, paraEnd, orientation, paint)
-                android.util.Log.e("Debug", "$intrinsic")
                 lines.addAll(VerticalLine.breakLine(intrinsic, height))
 
                 paraStart = paraEnd

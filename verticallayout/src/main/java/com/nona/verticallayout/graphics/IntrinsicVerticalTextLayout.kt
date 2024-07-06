@@ -308,7 +308,6 @@ class UprightVerticalLayoutRun(
                 remaining -= vChar
             }
         }
-        Log.e("Debug", "?????")
         return null
     }
 
