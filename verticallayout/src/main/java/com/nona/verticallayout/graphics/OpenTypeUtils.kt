@@ -1,7 +1,10 @@
 package com.nona.verticallayout.graphics
 
+import android.util.SparseIntArray
+import androidx.core.util.getOrDefault
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.util.Arrays
 import kotlin.IllegalArgumentException
 
 private const val TAG_vmtx = 0x766d7478
@@ -143,26 +146,94 @@ class OpenTypeTable_hmtx(
 
 class OpenTypeTable_cmap(
     private val buffer: ByteBuffer,
-    offset: Int
+    offset: Int,
+    preprocess: Boolean = false
 ) {
     private val cmapOffset = getPreferredCmapOffset(offset)
+    private val numGroups = buffer.getUint32AsInt32Safe(cmapOffset + 12)
 
-    fun getGlyphId(codePoint: Int): Int {
+    private val cache = SparseIntArray(256)
+
+    private val reorderedCmap: IntArray?
+
+    init {
         require(buffer.getUint16(cmapOffset) == 12)
         require(buffer.getUint16(cmapOffset + 2) == 0)
-        val numGroups = buffer.getUint32AsInt32Safe(cmapOffset + 12)
 
-        // TODO: binary search
-        for (i in 0 until numGroups) {
-            val startCharCode = buffer.getUint32AsInt32Safe(cmapOffset + 16 + i * 12)
-            val endCharCode = buffer.getUint32AsInt32Safe(cmapOffset + 16 + i * 12 + 4)
-            val startGlyphId = buffer.getUint32AsInt32Safe(cmapOffset + 16 + i * 12 + 8)
+        if (preprocess) {
+            val numGroups = buffer.getUint32AsInt32Safe(cmapOffset + 12)
+            reorderedCmap = IntArray(numGroups * 3)
+            for (i in 0 until numGroups) {
+                reorderedCmap[i] = buffer.getUint32AsInt32Safe(cmapOffset + 16 + i * 12)
+            }
+            for (i in 0 until numGroups) {
+                reorderedCmap[numGroups + i] = buffer.getUint32AsInt32Safe(cmapOffset + 16 + i * 12 + 4)
+            }
+            for (i in 0 until numGroups) {
+                reorderedCmap[numGroups * 2 + i] = buffer.getUint32AsInt32Safe(cmapOffset + 16 + i * 12 + 8)
+            }
+        } else {
+            reorderedCmap = null
+        }
+    }
 
-            if (codePoint in startCharCode..endCharCode) { // inc-inc
-                return (startGlyphId + (codePoint - startCharCode))
+    fun getGlyphId(codePoint: Int): Int {
+        if (reorderedCmap != null) {
+            var startIndex = Arrays.binarySearch(reorderedCmap, 0, numGroups, codePoint)
+            if (startIndex >= 0) {
+                val startCp = reorderedCmap[startIndex]
+                val startGid = reorderedCmap[numGroups * 2 + startIndex]
+                return startGid + (codePoint - startCp)
+            } else {
+                startIndex = startIndex.inv()
+                if (startIndex == 0) {
+                    return 0
+                }
+                startIndex -= 1
+                val startCp = reorderedCmap[startIndex]
+                val endCp = reorderedCmap[numGroups  + startIndex]
+                val startGid = reorderedCmap[numGroups * 2 + startIndex]
+                if (codePoint <= endCp) {
+                    return startGid + (codePoint - startCp)
+                }
+                return 0
             }
         }
-        return 0 // 0 is reserved for no-glyph ID
+
+
+        val cached = cache.getOrDefault(codePoint, -1)
+        if (cached != -1) {
+            return cached;
+        }
+
+        var start = 0
+        var end = numGroups
+        while (end - start > 1) {
+            val half = (end - start) / 2
+            val mid = start + half
+
+            val startCharCode = buffer.getUint32AsInt32Safe(cmapOffset + 16 + mid * 12)
+
+            if (codePoint < startCharCode) {
+                end = mid
+            } else {
+                start = mid
+            }
+        }
+
+        if (start >= numGroups) {
+            return 0
+        }
+
+        val startCharCode = buffer.getUint32AsInt32Safe(cmapOffset + 16 + start * 12)
+        val endCharCode = buffer.getUint32AsInt32Safe(cmapOffset + 16 + start * 12 + 4)
+        if (codePoint in startCharCode..endCharCode) {
+            val startGlyphId = buffer.getUint32AsInt32Safe(cmapOffset + 16 + start * 12 + 8)
+            val gid = startGlyphId + (codePoint - startCharCode)
+            cache.put(codePoint, gid)
+            return gid
+        }
+        return 0
     }
 
     private fun getPreferredCmapOffset(offset: Int): Int {

@@ -23,6 +23,7 @@ android {
 
         testInstrumentationRunner = "androidx.benchmark.junit4.AndroidBenchmarkRunner"
         //testInstrumentationRunnerArguments["androidx.benchmark.profiling.mode"]= "MethodTracing"
+        testInstrumentationRunnerArguments["androidx.benchmark.profiling.mode"]= "StackSampling"
     }
 
     testBuildType = "release"

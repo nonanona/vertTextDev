@@ -15,6 +15,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.util.Locale
+import kotlin.streams.toList
 
 /**
  * Benchmark, which will execute on an Android device.
@@ -28,6 +29,7 @@ class ExampleBenchmark {
     @get:Rule
     val benchmarkRule = BenchmarkRule()
 
+    /*
     @Test
     fun parseHtml() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
@@ -35,6 +37,8 @@ class ExampleBenchmark {
             HtmlUtil.parseAsset(context, "wagahaihanekodearu.txt")
         }
     }
+
+     */
 
     @Test
     fun end2end() {
@@ -48,16 +52,21 @@ class ExampleBenchmark {
         }
     }
 
+    /*
     @Test
     fun getGlyphId() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val spanned = HtmlUtil.parseAsset(context, "wagahaihanekodearu.txt")
         val vMeasure = VerticalTextMeasure(Locale.JAPANESE)
         val ot = OpenTypeUtils.parse(vMeasure.verticalFont.buffer, vMeasure.verticalFont.ttcIndex)
+        val charMap = ot.charMap
+        val cpList = spanned.codePoints().toList().toIntArray()
         benchmarkRule.measureRepeated {
-            spanned.codePoints().forEach { cp ->
-                ot.charMap.getGlyphId(cp)
+            cpList.forEach { cp ->
+                charMap.getGlyphId(cp)
             }
         }
     }
+
+     */
 }
