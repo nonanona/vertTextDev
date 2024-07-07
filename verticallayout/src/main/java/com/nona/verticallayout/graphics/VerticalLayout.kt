@@ -29,15 +29,15 @@ class VerticalLayout private constructor(
     val lineLayouts: List<VerticalLine>
 ) {
 
+    val width: Float
+        get() = -lines.last().let { it.baseline - it.left}
+
     fun draw(canvas: Canvas, x: Float, y: Float, paint: Paint) {
         if (lineLayouts.isEmpty()) {
             Log.e("Debug", "Need to calculate full layout for drawing")
         }
         for (i in lines.indices) {
             lineLayouts[i].draw(canvas, x + lines[i].baseline, y, paint)
-        }
-        lines.forEach { it ->
-
         }
     }
 
@@ -48,6 +48,7 @@ class VerticalLayout private constructor(
                   orientation: TextOrientation,
                   paint: Paint,
                   height: Float,
+                  lineSpacing: Float,
                   computeFullLayout: Boolean = true,
         ) : VerticalLayout {
             val lines = mutableListOf<VerticalLineMetrics>()
@@ -61,7 +62,7 @@ class VerticalLayout private constructor(
                 val paraEnd = text.indexOf('\n', paraStart + 1).let { if (it == -1) end else it }
 
                 val intrinsic = measure.layoutText(text, paraStart, paraEnd, orientation, paint)
-                val paraLines = VerticalLine.breakLine(intrinsic, height, baseline)
+                val paraLines = VerticalLine.breakLine(intrinsic, height, baseline, lineSpacing)
 
                 if (computeFullLayout) {
                     for (i in paraLines.indices) {

@@ -6,6 +6,7 @@ import android.graphics.Paint
 import android.os.Bundle
 import android.text.TextUtils
 import android.util.AttributeSet
+import android.util.Log
 import android.view.View
 import android.widget.Button
 import android.widget.Toast
@@ -43,13 +44,18 @@ class VerticalLayoutView @JvmOverloads constructor(
                 text.length,
                 com.nona.verticallayout.graphics.TextOrientation.Mixed,
                 paint,
-                height.toFloat()
+                height.toFloat(),
+                2.0f * paint.textSize
             )
         } finally {
             val after = System.nanoTime()
             val nf = NumberFormat.getInstance()
             val msg = "Vertical layout too ${nf.format(after - before)} nsec"
             Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+            Log.e("Debug", "width = ${runLayout?.width}")
+        }
+        runLayout?.let {
+            setMeasuredDimension(it.width.toInt(), height)
         }
     }
 

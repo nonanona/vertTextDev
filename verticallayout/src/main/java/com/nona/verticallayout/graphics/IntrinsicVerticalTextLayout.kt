@@ -398,12 +398,13 @@ class VerticalLine(
 
     companion object {
 
-        fun breakLine(layout: IntrinsicVerticalLayout, height: Float, x: Float): List<VerticalLineMetrics> {
+        fun breakLine(layout: IntrinsicVerticalLayout, height: Float, x: Float, lineSpacing: Float): List<VerticalLineMetrics> {
             val result = mutableListOf<VerticalLineMetrics>()
             var lineStart = layout.start
             var baseline = x
             var left = 0f
             var right = 0f
+            val halfLineSpacing = lineSpacing / 2
 
             var curHeight = 0f
             for (i in 0 until layout.runs.size) {
@@ -411,8 +412,8 @@ class VerticalLine(
                 var runStart = run.start
                 var runHeight = run.height
                 val vRunMetrics = run.verticalMetrics(layout.paint)
-                left = max(left, vRunMetrics.left)
-                right = max(right, vRunMetrics.right)
+                left = max(halfLineSpacing, max(left, vRunMetrics.left))
+                right = max(halfLineSpacing, max(right, vRunMetrics.right))
 
                 while (curHeight + runHeight > height) {
                     val (breakIndex, consumed) = run.breakAt(runStart, height - curHeight)
@@ -422,8 +423,8 @@ class VerticalLine(
                         baseline -= left
                         lineStart = run.start
                         curHeight = 0f
-                        left = vRunMetrics.left
-                        right = vRunMetrics.right
+                        left = max(halfLineSpacing, vRunMetrics.left)
+                        right = max(halfLineSpacing, vRunMetrics.right)
                         break
                     } else {
                         baseline -= right
@@ -433,8 +434,8 @@ class VerticalLine(
                         runStart = breakIndex
                         curHeight = 0f
                         runHeight -= consumed
-                        left = vRunMetrics.left
-                        right = vRunMetrics.right
+                        left = max(halfLineSpacing, vRunMetrics.left)
+                        right = max(halfLineSpacing, vRunMetrics.right)
 
                     }
                 }

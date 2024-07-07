@@ -13,13 +13,10 @@
         </DropdownSelection>
         <DialogSelection />
       </SelectionState>
-      <SelectionState runConfigName="ExampleBenchmark (1)">
+      <SelectionState runConfigName="end2end()">
         <option name="selectionMode" value="DROPDOWN" />
       </SelectionState>
-      <SelectionState runConfigName="useAppContext()">
-        <option name="selectionMode" value="DROPDOWN" />
-      </SelectionState>
-      <SelectionState runConfigName="cmapCoverageTest()">
+      <SelectionState runConfigName="ExampleBenchmark">
         <option name="selectionMode" value="DROPDOWN" />
       </SelectionState>
     </selectionStates>
